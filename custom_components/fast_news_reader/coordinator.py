@@ -1,11 +1,11 @@
 """DataUpdateCoordinator for Fast News Reader."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import aiohttp
 import feedparser
 
 from homeassistant.config_entries import ConfigEntry
@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_LOCAL_TIME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    FETCH_TIMEOUT,
 )
 from .image_extractor import extract_image
 
@@ -34,12 +35,13 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.entry = entry
-        self.feed_url: str = entry.data[CONF_FEED_URL]
-        self.feed_name: str = entry.data[CONF_NAME]
-        self.date_format: str = entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
-        self.local_time: bool = entry.data.get(CONF_LOCAL_TIME, DEFAULT_LOCAL_TIME)
+        merged = {**entry.data, **entry.options}
+        self.feed_url: str = merged[CONF_FEED_URL]
+        self.feed_name: str = merged[CONF_NAME]
+        self.date_format: str = merged.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+        self.local_time: bool = merged.get(CONF_LOCAL_TIME, DEFAULT_LOCAL_TIME)
 
-        scan_interval_seconds = entry.data.get(
+        scan_interval_seconds = merged.get(
             CONF_SCAN_INTERVAL, int(DEFAULT_SCAN_INTERVAL.total_seconds())
         )
         super().__init__(
@@ -51,19 +53,24 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         session = async_get_clientsession(self.hass)
+        timeout = aiohttp.ClientTimeout(total=FETCH_TIMEOUT)
         try:
-            async with session.get(self.feed_url, timeout=30) as resp:
+            async with session.get(self.feed_url, timeout=timeout) as resp:
                 resp.raise_for_status()
                 content = await resp.read()
-        except Exception as err:
+        except aiohttp.ClientError as err:
             raise UpdateFailed(f"Fetch failed for {self.feed_url}: {err}") from err
+        except TimeoutError as err:
+            raise UpdateFailed(f"Timeout fetching {self.feed_url}") from err
 
         parsed = await self.hass.async_add_executor_job(feedparser.parse, content)
 
+        if parsed.get("bozo") and not parsed.entries:
+            exc = parsed.get("bozo_exception")
+            raise UpdateFailed(f"Could not parse feed {self.feed_url}: {exc}")
+
         channel = self._build_channel(parsed)
-        entries = await asyncio.gather(
-            *(self._build_entry(e) for e in parsed.entries)
-        )
+        entries = [e for e in (self._safe_build_entry(raw) for raw in parsed.entries) if e]
         return {"channel": channel, "entries": entries}
 
     def _build_channel(self, parsed: Any) -> dict[str, Any]:
@@ -79,14 +86,23 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "language": feed.get("language"),
         }
 
-    async def _build_entry(self, entry: Any) -> dict[str, Any]:
-        content_html = None
-        if content := entry.get("content"):
-            if content and isinstance(content, list):
-                first = content[0]
-                content_html = first.get("value") if isinstance(first, dict) else None
+    def _safe_build_entry(self, entry: Any) -> dict[str, Any] | None:
+        """Build entry dict, swallowing per-entry errors so one bad item doesn't kill the update."""
+        try:
+            return self._build_entry(entry)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception(
+                "Skipping malformed entry in feed %s", self.feed_url
+            )
+            return None
 
-        image = extract_image(entry, self.feed_url)
+    def _build_entry(self, entry: Any) -> dict[str, Any]:
+        content_html = None
+        if (content := entry.get("content")) and isinstance(content, list):
+            first = content[0]
+            content_html = first.get("value") if isinstance(first, dict) else None
+
+        categories = [t.get("term") for t in entry.get("tags") or [] if t.get("term")]
         return {
             "id": entry.get("id") or entry.get("guid") or entry.get("link"),
             "title": entry.get("title"),
@@ -94,10 +110,9 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "summary": entry.get("summary"),
             "content": content_html,
             "published": self._format_date(entry),
-            "image": image,
+            "image": extract_image(entry, self.feed_url),
             "author": entry.get("author"),
-            "category": [t.get("term") for t in entry.get("tags", []) if t.get("term")]
-            or None,
+            "category": categories or None,
         }
 
     def _format_date(self, entry: Any) -> str | None:

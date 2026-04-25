@@ -42,3 +42,55 @@ def test_relative_url_is_absolutized() -> None:
     }
     result = extract_image(entry, "https://example.com/feed.xml")
     assert result == "https://example.com/img/foo.jpg"
+
+
+def test_relative_url_resolves_against_entry_link() -> None:
+    """When the entry has a link, relative URLs should resolve against the article host."""
+    entry = {
+        "link": "https://articles.example.org/section/post-1",
+        "content": [{"value": '<p><img src="../img/foo.jpg"></p>'}],
+    }
+    result = extract_image(entry, "https://feed-cdn.example.com/feed.xml")
+    assert result == "https://articles.example.org/img/foo.jpg"
+
+
+def test_tracking_pixels_are_skipped() -> None:
+    entry = {
+        "content": [
+            {
+                "value": (
+                    '<img src="https://www.google-analytics.com/track.gif">'
+                    '<img src="https://images.example.com/real.jpg">'
+                )
+            }
+        ],
+    }
+    result = extract_image(entry, "https://example.com/feed.xml")
+    assert result == "https://images.example.com/real.jpg"
+
+
+def test_one_by_one_pixel_query_is_skipped() -> None:
+    entry = {
+        "content": [
+            {
+                "value": (
+                    '<img src="https://t.example.com/p?width=1&height=1">'
+                    '<img src="https://images.example.com/hero.jpg">'
+                )
+            }
+        ],
+    }
+    result = extract_image(entry, "https://example.com/feed.xml")
+    assert result == "https://images.example.com/hero.jpg"
+
+
+def test_img_tag_with_attributes_before_src() -> None:
+    entry = {
+        "content": [
+            {"value": '<img class="hero" loading="lazy" src="https://x.test/a.jpg">'}
+        ]
+    }
+    assert (
+        extract_image(entry, "https://example.com/feed.xml")
+        == "https://x.test/a.jpg"
+    )

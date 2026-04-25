@@ -13,8 +13,29 @@
         }
       }
     },
+    "error": {
+      "invalid_url": "URL must start with http:// or https://.",
+      "fetch_failed": "Could not reach the feed URL.",
+      "timeout": "The feed URL timed out.",
+      "interval_too_short": "Scan interval must be at least 60 seconds."
+    },
     "abort": {
       "already_configured": "This feed URL is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit feed options",
+        "data": {
+          "scan_interval": "Scan interval (seconds)",
+          "date_format": "Date format (strftime)",
+          "local_time": "Convert dates to local time"
+        }
+      }
+    },
+    "error": {
+      "interval_too_short": "Scan interval must be at least 60 seconds."
     }
   }
 }

@@ -13,8 +13,29 @@
         }
       }
     },
+    "error": {
+      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
+      "fetch_failed": "Die Feed-URL konnte nicht erreicht werden.",
+      "timeout": "Zeitüberschreitung beim Abrufen der Feed-URL.",
+      "interval_too_short": "Das Aktualisierungsintervall muss mindestens 60 Sekunden betragen."
+    },
     "abort": {
       "already_configured": "Diese Feed-URL ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Feed-Optionen bearbeiten",
+        "data": {
+          "scan_interval": "Aktualisierungsintervall (Sekunden)",
+          "date_format": "Datumsformat (strftime)",
+          "local_time": "Datum in lokale Zeitzone umwandeln"
+        }
+      }
+    },
+    "error": {
+      "interval_too_short": "Das Aktualisierungsintervall muss mindestens 60 Sekunden betragen."
     }
   }
 }
