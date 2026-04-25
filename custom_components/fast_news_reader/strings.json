@@ -66,7 +66,8 @@
       "already_configured": "You've already added this feed.",
       "no_presets_left": "You've already added every curated feed for this region. Add a custom URL or pick another region.",
       "reconfigure_url_taken": "Another feed entry already uses that URL.",
-      "reconfigure_successful": "Feed updated."
+      "reconfigure_successful": "Feed updated.",
+      "setup_started": "{count} feed(s) are being added in the background."
     }
   },
   "options": {

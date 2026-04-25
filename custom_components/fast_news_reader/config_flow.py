@@ -213,8 +213,11 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if not presets:
                     errors[CONF_PRESETS] = "unknown_preset"
                 else:
-                    # Schedule the rest as background imports, one ConfigEntry per feed.
-                    for preset in presets[1:]:
+                    # Route every feed (including the first) through SOURCE_IMPORT
+                    # so HA's per-entry 'Geraet erstellt' dialog never fires. The
+                    # area chosen above is propagated via entry data and applied
+                    # to each device in async_setup_entry.
+                    for preset in presets:
                         self.hass.async_create_task(
                             self.hass.config_entries.flow.async_init(
                                 DOMAIN,
@@ -227,21 +230,9 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 },
                             )
                         )
-
-                    # The first preset becomes the visible flow result.
-                    first = presets[0]
-                    await self.async_set_unique_id(first["url"])
-                    self._abort_if_unique_id_configured()
-                    return self.async_create_entry(
-                        title=first["name"],
-                        data={
-                            CONF_NAME: first["name"],
-                            CONF_FEED_URL: first["url"],
-                            CONF_SCAN_INTERVAL: self._scan_interval,
-                            CONF_DATE_FORMAT: DEFAULT_DATE_FORMAT,
-                            CONF_LOCAL_TIME: DEFAULT_LOCAL_TIME,
-                            CONF_AREA: self._area_id,
-                        },
+                    return self.async_abort(
+                        reason="setup_started",
+                        description_placeholders={"count": str(len(presets))},
                     )
 
         topic_label = (
