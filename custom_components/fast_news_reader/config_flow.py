@@ -377,14 +377,19 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(
         config_entry: ConfigEntry,
     ) -> FastNewsReaderOptionsFlow:
-        return FastNewsReaderOptionsFlow(config_entry)
+        # Don't pass config_entry: HA 2025.12+ injects it automatically via
+        # the OptionsFlow.config_entry property. Passing it (and storing it on
+        # self) raises in current HA.
+        return FastNewsReaderOptionsFlow()
 
 
 class FastNewsReaderOptionsFlow(config_entries.OptionsFlow):
-    """Edit scan_interval, date_format, local_time without re-adding."""
+    """Edit scan_interval, date_format, local_time without re-adding.
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
+    No __init__: HA 2025.12+ removed the ability to set self.config_entry
+    explicitly (it's now an auto-populated property). Subclasses that still
+    do `self.config_entry = config_entry` raise on init in current HA.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
