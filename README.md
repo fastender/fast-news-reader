@@ -1,6 +1,10 @@
-# 📰 Fast News Reader
+<p align="center">
+  <img src="docs/brand/logo@2x.png" alt="Fast News Reader" height="120">
+</p>
 
-> RSS for Home Assistant — with the images you actually want.
+<p align="center">
+  <em>RSS for Home Assistant — with the images you actually want.</em>
+</p>
 
 [![GitHub Release](https://img.shields.io/github/v/release/fastender/fast-news-reader?style=flat-square)](https://github.com/fastender/fast-news-reader/releases)
 [![Tests](https://img.shields.io/github/actions/workflow/status/fastender/fast-news-reader/test.yml?branch=main&label=tests&style=flat-square)](https://github.com/fastender/fast-news-reader/actions/workflows/test.yml)
