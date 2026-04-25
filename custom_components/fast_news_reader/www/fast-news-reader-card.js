@@ -1,22 +1,20 @@
 /*!
- * Fast News Reader, Lovelace card
+ * Fast News Reader - Lovelace card.
  *
- * Vanilla web component, no Lit, no build step. Reads `entries` from a
- * fast_news_reader sensor and renders a Feedly-style stack of articles
- * with image, title, summary, and relative time. Clicking an article
- * opens a fullscreen reader with prev/next navigation.
+ * Vanilla web components, no Lit, no build step.
  *
  * Card config:
  *   type: custom:fast-news-reader-card
- *   entity: sensor.tagesschau
- *   max_items: 5            # default 5
- *   show_image: true        # default true
- *   show_summary: true      # default true
- *   show_date: true         # default true
- *   title: "My news"        # optional, defaults to channel.title
+ *   entities: [sensor.tagesschau, sensor.heise]   # multi-source supported
+ *   # entity: sensor.tagesschau                    # legacy single source still works
+ *   max_items: 5
+ *   show_image: true
+ *   show_summary: true
+ *   show_date: true
+ *   title: "My news"
  */
 
-const CARD_VERSION = "0.7.3";
+const CARD_VERSION = "0.8.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -24,9 +22,9 @@ console.info(
   "color:#FF6B4A;background:#1A1A1A;font-weight:700;border-radius:0 3px 3px 0;padding:2px 6px"
 );
 
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // Helpers
-// ---------------------------------------------------------------------------
+// ===========================================================================
 
 function stripHtml(s) {
   if (!s) return "";
@@ -41,10 +39,30 @@ const ALLOWED_TAGS = new Set([
   "UL", "OL", "LI", "BLOCKQUOTE", "FIGURE", "FIGCAPTION",
   "IMG", "A", "PICTURE", "SOURCE", "HR",
 ]);
-function sanitizeHtml(html) {
+
+// Strip the hero-image src so it doesn't appear twice (once as the modal
+// hero and once embedded in the article body). Also drops scripts, inline
+// event handlers, and javascript:/data: URLs.
+function sanitizeHtml(html, heroSrc) {
   if (!html) return "";
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
+
+  // Remove duplicate hero images. RSS content often starts with the same
+  // image we're already showing big at the top of the modal.
+  if (heroSrc) {
+    const heroFile = (heroSrc.split("?")[0].split("/").pop() || "").toLowerCase();
+    tmp.querySelectorAll("img").forEach((img) => {
+      const src = (img.getAttribute("src") || "").toLowerCase();
+      if (!src) return;
+      const file = src.split("?")[0].split("/").pop() || "";
+      if (src === heroSrc.toLowerCase() || file === heroFile) {
+        const enclosingFigure = img.closest("figure");
+        (enclosingFigure || img).remove();
+      }
+    });
+  }
+
   const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_ELEMENT, null);
   const toRemove = [];
   while (walker.nextNode()) {
@@ -100,29 +118,67 @@ function absoluteDate(iso, locale) {
   }).format(t);
 }
 
+function articleId(entry) {
+  return entry.id || entry.link || entry.title || "";
+}
+
 // ===========================================================================
-// 1) Visual editor - defined FIRST so getConfigElement always finds it.
-//    Plain HTML form, no <ha-form> dependency. ha-form is only loaded after
-//    the user has visited certain HA routes; relying on it makes the editor
-//    silently fail for fresh sessions. Plain inputs work everywhere.
+// Per-article actions, stored in localStorage. Card and modal both read
+// this; they listen for "fnr:state-changed" so any action propagates.
+// ===========================================================================
+
+const ACTIONS = ["saved", "favorite", "hidden"];
+
+const ArticleStore = {
+  _key(category) {
+    return `fnr-${category}`;
+  },
+  load(category) {
+    try {
+      const raw = localStorage.getItem(this._key(category));
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  },
+  save(category, set) {
+    try {
+      localStorage.setItem(this._key(category), JSON.stringify([...set]));
+    } catch {
+      /* ignore storage errors */
+    }
+  },
+  has(category, id) {
+    return this.load(category).has(id);
+  },
+  toggle(category, id) {
+    const set = this.load(category);
+    const now = !set.has(id);
+    if (now) set.add(id);
+    else set.delete(id);
+    this.save(category, set);
+    window.dispatchEvent(
+      new CustomEvent("fnr:state-changed", { detail: { category, id } })
+    );
+    return now;
+  },
+};
+
+// ===========================================================================
+// 1) Visual editor (defined first)
 // ===========================================================================
 
 const EDITOR_STYLES = `
   :host, :scope { display: block; }
-  .editor-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 14px;
-  }
-  .editor-row label {
+  .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+  .row label.lbl {
     font-size: 0.85rem;
     color: var(--secondary-text-color, #666);
     font-weight: 500;
   }
-  .editor-row input[type="text"],
-  .editor-row input[type="number"],
-  .editor-row select {
+  .row input[type="text"],
+  .row input[type="number"],
+  .row select {
     background: var(--card-background-color, #fff);
     color: var(--primary-text-color, #1a1a1a);
     border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
@@ -131,12 +187,38 @@ const EDITOR_STYLES = `
     font-size: 0.95rem;
     font-family: inherit;
   }
-  .editor-row input[type="text"]:focus,
-  .editor-row input[type="number"]:focus,
-  .editor-row select:focus {
+  .row input:focus, .row select:focus {
     outline: none;
     border-color: var(--primary-color, #FF6B4A);
   }
+  .feed-row {
+    display: flex; gap: 6px; align-items: center;
+    margin-bottom: 6px;
+  }
+  .feed-row select { flex: 1; }
+  .icon-btn {
+    flex: 0 0 36px;
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+    background: var(--card-background-color, #fff);
+    color: var(--primary-text-color, #1a1a1a);
+    cursor: pointer;
+    font-size: 1.1rem;
+  }
+  .icon-btn:hover { background: var(--secondary-background-color, rgba(0,0,0,0.04)); }
+  .add-feed {
+    margin-top: 4px;
+    align-self: flex-start;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px dashed var(--divider-color, rgba(0,0,0,0.18));
+    background: transparent;
+    color: var(--primary-color, #FF6B4A);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .add-feed:hover { background: var(--secondary-background-color, rgba(0,0,0,0.04)); }
   .toggles {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -144,9 +226,7 @@ const EDITOR_STYLES = `
     margin-top: 4px;
   }
   .toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 8px 10px;
     border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
     border-radius: 6px;
@@ -155,10 +235,7 @@ const EDITOR_STYLES = `
     user-select: none;
   }
   .toggle input { margin: 0; cursor: pointer; }
-  .hint {
-    font-size: 0.78rem;
-    color: var(--secondary-text-color, #888);
-  }
+  .hint { font-size: 0.78rem; color: var(--secondary-text-color, #888); }
 `;
 
 class FastNewsReaderCardEditor extends HTMLElement {
@@ -169,14 +246,19 @@ class FastNewsReaderCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { ...config };
+    // Normalize legacy `entity` to `entities` array for the editor.
+    const cfg = { ...config };
+    if (!cfg.entities && cfg.entity) cfg.entities = [cfg.entity];
+    if (!cfg.entities) cfg.entities = [];
+    delete cfg.entity;
+    this._config = cfg;
     if (this._rendered) this._fill();
     else this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._rendered) this._refreshEntityOptions();
+    if (this._rendered) this._refreshAllSelects();
     else this._render();
   }
 
@@ -203,24 +285,24 @@ class FastNewsReaderCardEditor extends HTMLElement {
 
   _render() {
     if (!this._hass) return;
-
     this.innerHTML = `
       <style>${EDITOR_STYLES}</style>
-      <div class="editor-row">
-        <label for="fnr-entity">Feed</label>
-        <select id="fnr-entity"></select>
-        <span class="hint">Pick a Fast News Reader sensor.</span>
+      <div class="row">
+        <label class="lbl">Feeds</label>
+        <div id="fnr-feeds"></div>
+        <button type="button" class="add-feed" id="fnr-add">+ Add feed</button>
+        <span class="hint">Add as many feeds as you like. The card mixes them by date.</span>
       </div>
-      <div class="editor-row">
-        <label for="fnr-title">Title (optional)</label>
-        <input id="fnr-title" type="text" placeholder="Defaults to the feed's channel title">
+      <div class="row">
+        <label class="lbl" for="fnr-title">Title (optional)</label>
+        <input id="fnr-title" type="text" placeholder="Defaults to channel title">
       </div>
-      <div class="editor-row">
-        <label for="fnr-max">Max items shown</label>
+      <div class="row">
+        <label class="lbl" for="fnr-max">Max items shown</label>
         <input id="fnr-max" type="number" min="1" max="50" step="1">
       </div>
-      <div class="editor-row">
-        <label>Show in card</label>
+      <div class="row">
+        <label class="lbl">Show in card</label>
         <div class="toggles">
           <label class="toggle"><input id="fnr-img" type="checkbox"> Image</label>
           <label class="toggle"><input id="fnr-sum" type="checkbox"> Summary</label>
@@ -229,68 +311,122 @@ class FastNewsReaderCardEditor extends HTMLElement {
       </div>
     `;
 
-    this._refreshEntityOptions();
-    this._fill();
+    this._renderFeedRows();
+    this._fillSimpleFields();
 
-    const set = (key, val) => {
-      this._config = { ...this._config, [key]: val };
+    this.querySelector("#fnr-add").addEventListener("click", () => {
+      const ids = this._availableEntities();
+      const taken = new Set(this._config.entities || []);
+      const next = ids.find((i) => !taken.has(i)) || ids[0] || "";
+      this._config = {
+        ...this._config,
+        entities: [...(this._config.entities || []), next],
+      };
+      this._renderFeedRows();
       this._emit();
-    };
+    });
 
-    this.querySelector("#fnr-entity").addEventListener("change", (e) =>
-      set("entity", e.target.value)
-    );
-    this.querySelector("#fnr-title").addEventListener("input", (e) =>
-      set("title", e.target.value || undefined)
-    );
+    this.querySelector("#fnr-title").addEventListener("input", (e) => {
+      const v = e.target.value;
+      this._config = { ...this._config, title: v || undefined };
+      this._emit();
+    });
     this.querySelector("#fnr-max").addEventListener("input", (e) => {
       const n = parseInt(e.target.value, 10);
-      set("max_items", isNaN(n) ? 5 : n);
+      this._config = { ...this._config, max_items: isNaN(n) ? 5 : n };
+      this._emit();
     });
-    this.querySelector("#fnr-img").addEventListener("change", (e) =>
-      set("show_image", e.target.checked)
-    );
-    this.querySelector("#fnr-sum").addEventListener("change", (e) =>
-      set("show_summary", e.target.checked)
-    );
-    this.querySelector("#fnr-date").addEventListener("change", (e) =>
-      set("show_date", e.target.checked)
-    );
+    this.querySelector("#fnr-img").addEventListener("change", (e) => {
+      this._config = { ...this._config, show_image: e.target.checked };
+      this._emit();
+    });
+    this.querySelector("#fnr-sum").addEventListener("change", (e) => {
+      this._config = { ...this._config, show_summary: e.target.checked };
+      this._emit();
+    });
+    this.querySelector("#fnr-date").addEventListener("change", (e) => {
+      this._config = { ...this._config, show_date: e.target.checked };
+      this._emit();
+    });
 
     this._rendered = true;
   }
 
-  _refreshEntityOptions() {
-    const select = this.querySelector("#fnr-entity");
-    if (!select) return;
+  _renderFeedRows() {
+    const container = this.querySelector("#fnr-feeds");
+    container.innerHTML = "";
     const ids = this._availableEntities();
-    const current = this._config.entity || "";
-    select.innerHTML = "";
+    const entities = this._config.entities || [];
 
-    if (current && !ids.includes(current)) ids.unshift(current);
-    if (!ids.length) ids.push("");
-
-    for (const id of ids) {
-      const opt = document.createElement("option");
-      opt.value = id;
-      const stateObj = this._hass?.states?.[id];
-      const friendly = stateObj?.attributes?.friendly_name;
-      opt.textContent = id ? `${friendly || id} (${id})` : "(no feeds yet)";
-      select.appendChild(opt);
+    if (!entities.length) {
+      const note = document.createElement("div");
+      note.className = "hint";
+      note.textContent =
+        ids.length === 0
+          ? "No Fast News Reader sensors found yet. Add a feed via Settings → Devices & Services first."
+          : "Click + to add your first feed.";
+      container.appendChild(note);
+      return;
     }
-    select.value = current;
+
+    entities.forEach((current, idx) => {
+      const row = document.createElement("div");
+      row.className = "feed-row";
+
+      const select = document.createElement("select");
+      const all = [...ids];
+      if (current && !all.includes(current)) all.unshift(current);
+      for (const id of all) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        const friendly = this._hass?.states?.[id]?.attributes?.friendly_name;
+        opt.textContent = friendly ? `${friendly} (${id})` : id;
+        select.appendChild(opt);
+      }
+      select.value = current || "";
+      select.addEventListener("change", (e) => {
+        const next = [...(this._config.entities || [])];
+        next[idx] = e.target.value;
+        this._config = { ...this._config, entities: next };
+        this._emit();
+      });
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "icon-btn";
+      remove.textContent = "×";
+      remove.title = "Remove feed";
+      remove.addEventListener("click", () => {
+        const next = (this._config.entities || []).filter((_, i) => i !== idx);
+        this._config = { ...this._config, entities: next };
+        this._renderFeedRows();
+        this._emit();
+      });
+
+      row.appendChild(select);
+      row.appendChild(remove);
+      container.appendChild(row);
+    });
   }
 
-  _fill() {
+  _refreshAllSelects() {
+    this._renderFeedRows();
+  }
+
+  _fillSimpleFields() {
     const q = (sel) => this.querySelector(sel);
-    if (!q("#fnr-entity")) return;
-    q("#fnr-entity").value = this._config.entity || "";
+    if (!q("#fnr-title")) return;
     q("#fnr-title").value = this._config.title || "";
     q("#fnr-max").value =
       this._config.max_items !== undefined ? this._config.max_items : 5;
     q("#fnr-img").checked = this._config.show_image !== false;
     q("#fnr-sum").checked = this._config.show_summary !== false;
     q("#fnr-date").checked = this._config.show_date !== false;
+  }
+
+  _fill() {
+    this._fillSimpleFields();
+    this._renderFeedRows();
   }
 }
 
@@ -303,75 +439,95 @@ if (!customElements.get("fast-news-reader-card-editor")) {
 }
 
 // ===========================================================================
-// 2) Reader modal (Feedly-style overlay, prev/next, keyboard, swipe)
+// 2) Reader modal
+//
+// The shell (overlay + nav + panel) is built once. Navigating with prev/next
+// only updates fields inside the panel, so the overlay never disappears and
+// the dashboard never flashes through.
 // ===========================================================================
 
 const MODAL_STYLES = `
   :host { all: initial; }
   .overlay {
     position: fixed; inset: 0;
-    background: color-mix(in srgb, var(--primary-background-color, #fff) 92%, transparent);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     display: flex; align-items: center; justify-content: center;
     z-index: 9999;
     animation: fade-in 160ms ease-out;
     font-family: var(--primary-font-family, system-ui, -apple-system, sans-serif);
-    color: var(--primary-text-color, #1a1a1a);
+    color: var(--primary-text-color, #fff);
   }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   .panel {
     position: relative;
-    background: var(--card-background-color, #fff);
+    background: var(--card-background-color, #1a1a1a);
     border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     width: min(740px, 92vw);
     max-height: 90vh;
     overflow-y: auto;
     animation: slide-up 220ms cubic-bezier(.2,.8,.2,1);
+    z-index: 1;
   }
+  .panel.fade-out .body, .panel.fade-out .hero { opacity: 0.4; transition: opacity 80ms ease; }
+  .panel.fade-in .body, .panel.fade-in .hero { opacity: 1; transition: opacity 200ms ease; }
   @keyframes slide-up {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
-  .close {
+  .actions {
     position: absolute; top: 12px; right: 12px;
+    display: flex; gap: 6px;
+    z-index: 3;
+  }
+  .action-btn {
     width: 36px; height: 36px;
     border: none; border-radius: 50%;
-    background: var(--secondary-background-color, rgba(0,0,0,0.05));
-    color: var(--primary-text-color, #1a1a1a);
-    cursor: pointer; font-size: 20px; line-height: 1;
+    background: var(--secondary-background-color, rgba(255,255,255,0.08));
+    color: var(--primary-text-color, #f0f0f0);
+    cursor: pointer; font-size: 16px; line-height: 1;
     display: flex; align-items: center; justify-content: center;
-    transition: background-color 120ms ease;
-    z-index: 2;
+    transition: background-color 120ms ease, color 120ms ease;
   }
-  .close:hover { background: var(--divider-color, rgba(0,0,0,0.12)); }
+  .action-btn:hover { background: var(--divider-color, rgba(255,255,255,0.18)); }
+  .action-btn[data-active="true"] { color: var(--primary-color, #FF6B4A); }
+  .action-btn.close { font-size: 20px; }
+
   .nav {
     position: fixed; top: 50%; transform: translateY(-50%);
     width: 56px; height: 56px;
     border: none; border-radius: 50%;
-    background: var(--card-background-color, #fff);
-    color: var(--primary-text-color, #1a1a1a);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    background: rgba(40, 40, 40, 0.9);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     cursor: pointer; font-size: 22px;
     display: flex; align-items: center; justify-content: center;
     transition: transform 120ms ease, opacity 120ms ease;
+    z-index: 10;
   }
   .nav:hover { transform: translateY(-50%) scale(1.06); }
   .nav:disabled { opacity: 0.35; cursor: default; transform: translateY(-50%); }
-  .nav.prev { left: max(16px, calc((100vw - 740px) / 2 - 80px)); }
-  .nav.next { right: max(16px, calc((100vw - 740px) / 2 - 80px)); }
+  .nav.prev { left: 12px; }
+  .nav.next { right: 12px; }
+  @media (min-width: 900px) {
+    .nav.prev { left: max(12px, calc((100vw - 740px) / 2 - 80px)); }
+    .nav.next { right: max(12px, calc((100vw - 740px) / 2 - 80px)); }
+  }
+
   .hero {
     width: 100%; height: 360px;
     object-fit: cover;
     display: block;
-    background: var(--secondary-background-color, #f3f3f3);
+    background: var(--secondary-background-color, #2a2a2a);
   }
   .hero-fallback { height: 0; }
+
   .body { padding: 24px 28px 32px; }
   .source {
     font-size: 0.78rem;
-    color: var(--secondary-text-color);
+    color: var(--secondary-text-color, #aaa);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 8px;
@@ -381,18 +537,18 @@ const MODAL_STYLES = `
     font-size: 1.6rem;
     line-height: 1.2;
     font-weight: 700;
-    color: var(--primary-text-color);
+    color: var(--primary-text-color, #f5f5f5);
   }
   .meta {
     font-size: 0.85rem;
-    color: var(--secondary-text-color);
+    color: var(--secondary-text-color, #aaa);
     margin-bottom: 20px;
   }
   .meta .dot { opacity: 0.5; padding: 0 4px; }
   .content {
     font-size: 0.95rem;
     line-height: 1.6;
-    color: var(--primary-text-color);
+    color: var(--primary-text-color, #e8e8e8);
   }
   .content p { margin: 0 0 12px; }
   .content img {
@@ -415,12 +571,13 @@ const MODAL_STYLES = `
     transition: filter 120ms ease;
   }
   .visit:hover { filter: brightness(1.06); }
+
   @media (max-width: 600px) {
     .panel { width: 100vw; max-width: 100vw; max-height: 100vh; border-radius: 0; }
     .hero { height: 240px; }
     .body { padding: 20px; }
     h1 { font-size: 1.35rem; }
-    .nav { display: none; }
+    .nav { width: 44px; height: 44px; font-size: 18px; }
   }
 `;
 
@@ -430,20 +587,23 @@ class FastNewsReaderModal extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._index = 0;
     this._entries = [];
-    this._sourceTitle = "";
+    this._sourceTitleFor = () => "";
     this._locale = "en";
     this._keyHandler = this._onKey.bind(this);
     this._touchStartX = null;
+    this._built = false;
+    this._refs = {};
   }
 
-  open({ entries, index, sourceTitle, locale }) {
+  open({ entries, index, sourceTitleFor, locale }) {
     this._entries = entries;
     this._index = index;
-    this._sourceTitle = sourceTitle;
+    this._sourceTitleFor = sourceTitleFor || (() => "");
     this._locale = locale || "en";
-    this._render();
+    this._buildShellOnce();
+    this._fill();
     document.addEventListener("keydown", this._keyHandler);
-    this.shadowRoot.querySelector(".panel")?.focus({ preventScroll: true });
+    this._refs.panel?.focus({ preventScroll: true });
   }
 
   close() {
@@ -462,9 +622,21 @@ class FastNewsReaderModal extends HTMLElement {
     const next = this._index + delta;
     if (next < 0 || next >= this._entries.length) return;
     this._index = next;
-    this._render();
-    const panel = this.shadowRoot.querySelector(".panel");
-    if (panel) panel.scrollTop = 0;
+
+    // Soft fade-out / fade-in only on body+hero. Overlay stays.
+    const panel = this._refs.panel;
+    if (panel) {
+      panel.classList.remove("fade-in");
+      panel.classList.add("fade-out");
+      setTimeout(() => {
+        this._fill();
+        panel.scrollTop = 0;
+        panel.classList.remove("fade-out");
+        panel.classList.add("fade-in");
+      }, 80);
+    } else {
+      this._fill();
+    }
   }
 
   _onTouchStart(e) {
@@ -479,53 +651,135 @@ class FastNewsReaderModal extends HTMLElement {
     this._touchStartX = null;
   }
 
-  _render() {
-    const e = this._entries[this._index];
-    if (!e) return;
-    const hasPrev = this._index > 0;
-    const hasNext = this._index < this._entries.length - 1;
-    const html = sanitizeHtml(e.content || e.summary || "");
-    const dateStr = absoluteDate(e.published, this._locale);
-
+  _buildShellOnce() {
+    if (this._built) return;
     this.shadowRoot.innerHTML = `
       <style>${MODAL_STYLES}</style>
       <div class="overlay" part="overlay">
-        <button class="nav prev" ${hasPrev ? "" : "disabled"} aria-label="Previous">‹</button>
+        <button class="nav prev" aria-label="Previous">‹</button>
         <article class="panel" tabindex="-1">
-          <button class="close" aria-label="Close">×</button>
-          ${e.image
-            ? `<img class="hero" src="${e.image}" alt="">`
-            : `<div class="hero-fallback"></div>`
-          }
+          <div class="actions">
+            <button class="action-btn save" title="Read later" aria-label="Read later">🔖</button>
+            <button class="action-btn fav" title="Favorite" aria-label="Favorite">★</button>
+            <button class="action-btn hide" title="Hide" aria-label="Hide">⊘</button>
+            <button class="action-btn close" title="Close" aria-label="Close">×</button>
+          </div>
+          <img class="hero" alt="">
           <div class="body">
-            <div class="source">${this._sourceTitle || ""}</div>
-            <h1>${e.title || ""}</h1>
-            <div class="meta">
-              ${dateStr}
-              ${e.author ? `<span class="dot">·</span>${e.author}` : ""}
-            </div>
-            <div class="content">${html || `<p>${stripHtml(e.summary || "")}</p>`}</div>
-            ${e.link
-              ? `<a class="visit" href="${e.link}" target="_blank" rel="noopener noreferrer">
-                   Quelle öffnen ↗
-                 </a>`
-              : ""
-            }
+            <div class="source"></div>
+            <h1></h1>
+            <div class="meta"></div>
+            <div class="content"></div>
+            <a class="visit" target="_blank" rel="noopener noreferrer">Quelle öffnen ↗</a>
           </div>
         </article>
-        <button class="nav next" ${hasNext ? "" : "disabled"} aria-label="Next">›</button>
+        <button class="nav next" aria-label="Next">›</button>
       </div>
     `;
 
-    this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
-    this.shadowRoot.querySelector(".nav.prev").addEventListener("click", () => this._go(-1));
-    this.shadowRoot.querySelector(".nav.next").addEventListener("click", () => this._go(1));
-    const overlay = this.shadowRoot.querySelector(".overlay");
-    overlay.addEventListener("click", (ev) => {
-      if (ev.target === overlay) this.close();
+    const r = this.shadowRoot;
+    this._refs = {
+      overlay: r.querySelector(".overlay"),
+      panel: r.querySelector(".panel"),
+      hero: r.querySelector(".hero"),
+      source: r.querySelector(".source"),
+      h1: r.querySelector("h1"),
+      meta: r.querySelector(".meta"),
+      content: r.querySelector(".content"),
+      visit: r.querySelector(".visit"),
+      prev: r.querySelector(".nav.prev"),
+      next: r.querySelector(".nav.next"),
+      close: r.querySelector(".action-btn.close"),
+      save: r.querySelector(".action-btn.save"),
+      fav: r.querySelector(".action-btn.fav"),
+      hide: r.querySelector(".action-btn.hide"),
+    };
+
+    this._refs.close.addEventListener("click", () => this.close());
+    this._refs.prev.addEventListener("click", () => this._go(-1));
+    this._refs.next.addEventListener("click", () => this._go(1));
+    this._refs.overlay.addEventListener("click", (ev) => {
+      if (ev.target === this._refs.overlay) this.close();
     });
-    overlay.addEventListener("touchstart", (ev) => this._onTouchStart(ev), { passive: true });
-    overlay.addEventListener("touchend", (ev) => this._onTouchEnd(ev), { passive: true });
+    this._refs.overlay.addEventListener("touchstart", (ev) => this._onTouchStart(ev), { passive: true });
+    this._refs.overlay.addEventListener("touchend", (ev) => this._onTouchEnd(ev), { passive: true });
+
+    const toggleFor = (cat, btn) => {
+      btn.addEventListener("click", () => {
+        const e = this._entries[this._index];
+        if (!e) return;
+        const id = articleId(e);
+        ArticleStore.toggle(cat, id);
+        this._refreshActionStates();
+        if (cat === "hidden") {
+          // Skip past hidden article. If at end, close.
+          const remaining = this._entries.filter(
+            (x) => !ArticleStore.has("hidden", articleId(x))
+          );
+          if (!remaining.length) this.close();
+          else this._go(1);
+        }
+      });
+    };
+    toggleFor("saved", this._refs.save);
+    toggleFor("favorite", this._refs.fav);
+    toggleFor("hidden", this._refs.hide);
+
+    this._built = true;
+  }
+
+  _fill() {
+    const e = this._entries[this._index];
+    if (!e) return;
+    const r = this._refs;
+    const sourceTitle = this._sourceTitleFor(e);
+    const html = sanitizeHtml(e.content || e.summary || "", e.image || "");
+    const dateStr = absoluteDate(e.published, this._locale);
+
+    r.source.textContent = sourceTitle;
+    r.h1.textContent = e.title || "";
+
+    r.meta.innerHTML = "";
+    if (dateStr) r.meta.append(document.createTextNode(dateStr));
+    if (e.author) {
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.textContent = "·";
+      r.meta.append(dot, document.createTextNode(e.author));
+    }
+
+    if (e.image) {
+      r.hero.src = e.image;
+      r.hero.classList.remove("hero-fallback");
+      r.hero.style.display = "";
+    } else {
+      r.hero.removeAttribute("src");
+      r.hero.classList.add("hero-fallback");
+      r.hero.style.display = "none";
+    }
+
+    r.content.innerHTML = html || `<p>${stripHtml(e.summary || "")}</p>`;
+
+    if (e.link) {
+      r.visit.href = e.link;
+      r.visit.style.display = "";
+    } else {
+      r.visit.style.display = "none";
+    }
+
+    r.prev.disabled = this._index <= 0;
+    r.next.disabled = this._index >= this._entries.length - 1;
+
+    this._refreshActionStates();
+  }
+
+  _refreshActionStates() {
+    const e = this._entries[this._index];
+    if (!e) return;
+    const id = articleId(e);
+    this._refs.save.dataset.active = String(ArticleStore.has("saved", id));
+    this._refs.fav.dataset.active = String(ArticleStore.has("favorite", id));
+    this._refs.hide.dataset.active = String(ArticleStore.has("hidden", id));
   }
 }
 
@@ -539,10 +793,7 @@ if (!customElements.get("fast-news-reader-modal")) {
 
 const CARD_STYLES = `
   :host { display: block; }
-  ha-card {
-    overflow: hidden;
-    padding: 0;
-  }
+  ha-card { overflow: hidden; padding: 0; }
   .header {
     padding: 16px 16px 8px;
     font-size: 1.05rem;
@@ -588,7 +839,9 @@ const CARD_STYLES = `
     gap: 4px;
     min-width: 0;
   }
+  .title-row { display: flex; align-items: flex-start; gap: 6px; }
   .title {
+    flex: 1;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--primary-text-color);
@@ -597,6 +850,12 @@ const CARD_STYLES = `
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  .badge {
+    font-size: 0.78rem;
+    color: var(--primary-color, #FF6B4A);
+    flex: 0 0 auto;
+    line-height: 1.3;
   }
   .summary {
     font-size: 0.82rem;
@@ -615,16 +874,24 @@ const CARD_STYLES = `
     gap: 6px;
   }
   .meta .dot { opacity: 0.5; }
+  .source-tag { color: var(--primary-color, #FF6B4A); font-weight: 600; }
 `;
 
 class FastNewsReaderCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._lastEntityState = null;
+    this._lastStateStamp = null;
+    this._stateChangedHandler = () => this._render();
   }
 
-  // HA calls this when opening the card editor.
+  connectedCallback() {
+    window.addEventListener("fnr:state-changed", this._stateChangedHandler);
+  }
+  disconnectedCallback() {
+    window.removeEventListener("fnr:state-changed", this._stateChangedHandler);
+  }
+
   static async getConfigElement() {
     console.info("[fast-news-reader] getConfigElement called");
     await customElements.whenDefined("fast-news-reader-card-editor");
@@ -632,12 +899,12 @@ class FastNewsReaderCard extends HTMLElement {
   }
 
   static getStubConfig(hass, entities) {
-    const candidate = (entities || []).find(
+    const candidates = (entities || []).filter(
       (e) => e.startsWith("sensor.") && hass.states[e]?.attributes?.entries
     );
     return {
       type: "custom:fast-news-reader-card",
-      entity: candidate || "sensor.fast_news_reader",
+      entities: candidates.length ? [candidates[0]] : ["sensor.fast_news_reader"],
       max_items: 5,
       show_image: true,
       show_summary: true,
@@ -646,11 +913,20 @@ class FastNewsReaderCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config || !config.entity) {
-      throw new Error("entity is required");
+    if (!config) throw new Error("config required");
+    // Normalize legacy `entity` to `entities` array.
+    const entities = config.entities
+      ? [...config.entities]
+      : config.entity
+      ? [config.entity]
+      : [];
+    if (!entities.length) {
+      throw new Error("at least one entity is required");
     }
-    if (!config.entity.startsWith("sensor.")) {
-      throw new Error("entity must be a sensor entity");
+    for (const id of entities) {
+      if (!id.startsWith("sensor.")) {
+        throw new Error(`entity must be a sensor: ${id}`);
+      }
     }
     this._config = {
       max_items: 5,
@@ -658,91 +934,142 @@ class FastNewsReaderCard extends HTMLElement {
       show_summary: true,
       show_date: true,
       ...config,
+      entities,
     };
-    this._lastEntityState = null;
+    delete this._config.entity;
+    this._lastStateStamp = null;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    const stateObj = hass.states[this._config?.entity];
-    const stamp = stateObj
-      ? `${stateObj.state}|${stateObj.last_updated}`
-      : "missing";
-    if (stamp !== this._lastEntityState) {
-      this._lastEntityState = stamp;
+    const stamp = this._stampForEntities();
+    if (stamp !== this._lastStateStamp) {
+      this._lastStateStamp = stamp;
       this._render();
     }
+  }
+
+  _stampForEntities() {
+    if (!this._hass || !this._config) return "missing";
+    return (this._config.entities || [])
+      .map((id) => {
+        const s = this._hass.states[id];
+        return s ? `${id}:${s.state}:${s.last_updated}` : `${id}:missing`;
+      })
+      .join("|");
   }
 
   getCardSize() {
     return Math.min(1 + (this._config?.max_items || 5), 8);
   }
 
-  _openModal(index) {
+  _aggregateEntries() {
+    if (!this._hass || !this._config) return { entries: [], byEntity: {} };
+    const hidden = ArticleStore.load("hidden");
+    const all = [];
+    const byEntity = {};
+    for (const id of this._config.entities) {
+      const stateObj = this._hass.states[id];
+      if (!stateObj) continue;
+      const channel = stateObj.attributes.channel || {};
+      const sourceTitle = channel.title || stateObj.attributes.friendly_name || id;
+      byEntity[id] = sourceTitle;
+      const entries = stateObj.attributes.entries || [];
+      for (const e of entries) {
+        if (hidden.has(articleId(e))) continue;
+        all.push({ ...e, _entityId: id, _sourceTitle: sourceTitle });
+      }
+    }
+    // Sort by published_dt (or published string) desc.
+    all.sort((a, b) => {
+      const ta = new Date(a.published_dt || a.published || 0).getTime() || 0;
+      const tb = new Date(b.published_dt || b.published || 0).getTime() || 0;
+      return tb - ta;
+    });
+    return { entries: all, byEntity };
+  }
+
+  _openModal(index, entries, byEntity) {
     console.info("[fast-news-reader] opening modal for index", index);
-    const stateObj = this._hass?.states[this._config.entity];
-    const entries = stateObj?.attributes?.entries || [];
-    const sourceTitle =
-      this._config.title ||
-      stateObj?.attributes?.channel?.title ||
-      stateObj?.attributes?.friendly_name ||
-      "";
     const locale = this._hass?.locale?.language || "en";
     const modal = document.createElement("fast-news-reader-modal");
     document.body.appendChild(modal);
-    modal.open({ entries, index, sourceTitle, locale });
+    modal.open({
+      entries,
+      index,
+      sourceTitleFor: (e) =>
+        this._config.title || e._sourceTitle || byEntity[e._entityId] || "",
+      locale,
+    });
   }
 
   _render() {
     if (!this._config) return;
     const hass = this._hass;
-    const stateObj = hass?.states[this._config.entity];
     const locale = hass?.locale?.language || "en";
 
-    if (!stateObj) {
-      this._renderShell(`
-        <div class="empty">Entity not found: ${this._config.entity}</div>
-      `);
+    if (!hass || !this._config.entities?.length) {
+      this._renderShell(`<div class="empty">No feed selected.</div>`);
       return;
     }
 
-    const channel = stateObj.attributes.channel || {};
-    const entries = (stateObj.attributes.entries || []).slice(
-      0,
-      this._config.max_items
-    );
-    const total = stateObj.attributes.entries?.length || 0;
+    const { entries: agg, byEntity } = this._aggregateEntries();
+    const totalAvailable = agg.length;
+    const visible = agg.slice(0, this._config.max_items);
+
     const headerTitle =
-      this._config.title || channel.title || stateObj.attributes.friendly_name || "";
+      this._config.title ||
+      (this._config.entities.length === 1
+        ? byEntity[this._config.entities[0]] || ""
+        : "Feeds");
+    const isMulti = this._config.entities.length > 1;
+    const favorites = ArticleStore.load("favorite");
+    const saved = ArticleStore.load("saved");
 
-    if (!entries.length) {
+    if (!visible.length) {
       this._renderShell(`
-        <div class="header">
-          <span>${headerTitle}</span>
-        </div>
-        <div class="empty">No entries yet.</div>
+        <div class="header"><span>${headerTitle}</span></div>
+        <div class="empty">No entries.</div>
       `);
       return;
     }
 
-    const itemsHtml = entries
+    const itemsHtml = visible
       .map((e, idx) => {
+        const id = articleId(e);
         const hasImg = this._config.show_image && e.image;
         const summary = this._config.show_summary && e.summary
           ? `<div class="summary">${stripHtml(e.summary)}</div>`
           : "";
-        const meta = this._config.show_date && e.published
-          ? `<div class="meta">
-               <span>${relativeTime(e.published, locale)}</span>
-               ${e.author ? `<span class="dot">·</span><span>${e.author}</span>` : ""}
-             </div>`
+        const metaParts = [];
+        if (this._config.show_date && e.published) {
+          metaParts.push(`<span>${relativeTime(e.published, locale)}</span>`);
+        }
+        if (isMulti) {
+          metaParts.push(`<span class="source-tag">${e._sourceTitle || ""}</span>`);
+        } else if (e.author) {
+          metaParts.push(`<span>${e.author}</span>`);
+        }
+        const meta = metaParts.length
+          ? `<div class="meta">${metaParts.join('<span class="dot">·</span>')}</div>`
           : "";
+
+        const badges = [];
+        if (favorites.has(id)) badges.push("★");
+        if (saved.has(id)) badges.push("🔖");
+        const badge = badges.length
+          ? `<span class="badge">${badges.join("")}</span>`
+          : "";
+
         return `
           <div class="article ${hasImg ? "" : "no-image"}" data-idx="${idx}" role="button" tabindex="0">
             ${hasImg ? `<img class="thumb" src="${e.image}" loading="lazy" alt="">` : ""}
             <div class="body">
-              <div class="title">${e.title || ""}</div>
+              <div class="title-row">
+                <div class="title">${e.title || ""}</div>
+                ${badge}
+              </div>
               ${summary}
               ${meta}
             </div>
@@ -754,18 +1081,18 @@ class FastNewsReaderCard extends HTMLElement {
     this._renderShell(`
       <div class="header">
         <span>${headerTitle}</span>
-        <span class="count">${total} entr${total === 1 ? "y" : "ies"}</span>
+        <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
       </div>
       <div class="list">${itemsHtml}</div>
     `);
 
     this.shadowRoot.querySelectorAll(".article").forEach((el) => {
       const idx = Number(el.dataset.idx);
-      el.addEventListener("click", () => this._openModal(idx));
+      el.addEventListener("click", () => this._openModal(idx, visible, byEntity));
       el.addEventListener("keydown", (ev) => {
         if (ev.key === "Enter" || ev.key === " ") {
           ev.preventDefault();
-          this._openModal(idx);
+          this._openModal(idx, visible, byEntity);
         }
       });
     });
@@ -793,7 +1120,7 @@ const cardMeta = {
   type: "fast-news-reader-card",
   name: "Fast News Reader",
   description:
-    "Feedly-style news card with images, titles, and a fullscreen reader on click.",
+    "Multi-source news card with images, fullscreen reader, prev/next, save/favorite/hide.",
   preview: false,
   documentationURL:
     "https://github.com/fastender/fast-news-reader#lovelace-card",

@@ -43,19 +43,23 @@ Via HACS as a custom repository:
 
 ## Lovelace card
 
-The card ships with the integration and registers itself automatically. Add it through "Add card", search for "Fast News Reader", and the visual editor appears (entity picker filtered to feed sensors, plus toggles for every option). Or paste the YAML:
+The card ships with the integration and registers itself automatically. Add it through "Add card", search for "Fast News Reader", and the visual editor appears (multi-feed picker, plus toggles for every option). Or paste YAML:
 
 ```yaml
 type: custom:fast-news-reader-card
-entity: sensor.tagesschau
-max_items: 5            # default 5
-show_image: true        # default true
-show_summary: true      # default true
-show_date: true         # default true (relative timestamp)
-title: "Tagesschau"     # optional, defaults to the channel title
+entities:                # one or many feed sensors, mixed by date
+  - sensor.tagesschau
+  - sensor.heise
+max_items: 5             # default 5
+show_image: true         # default true
+show_summary: true       # default true
+show_date: true          # default true (relative timestamp)
+title: "Mein News-Mix"   # optional override
+# legacy single-feed format also works:
+# entity: sensor.tagesschau
 ```
 
-The card shows a stack of articles with image, title, summary, and a relative timestamp. Clicking an article opens a fullscreen reader with the hero image, sanitized HTML content, and a "Quelle öffnen" button to open the source. Use the arrows on the sides (or arrow keys, or swipe on mobile) to flip between articles without leaving the reader. Theme-aware via HA CSS variables.
+The card shows a stack of articles, mixed by date when several feeds are selected. Clicking an article opens a fullscreen reader with hero image, sanitized HTML, and "Quelle öffnen". Side arrows, keyboard arrows, or swipe on mobile flip between articles. Each article has Read-later, Favorite and Hide actions in the modal header, persisted in browser localStorage. Hidden articles are filtered out of the card. Theme-aware via HA CSS variables.
 
 ## Sensor schema
 
