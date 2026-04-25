@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add RSS feed",
+        "description": "Configure a new RSS feed source.",
+        "data": {
+          "name": "Name",
+          "feed_url": "Feed URL",
+          "scan_interval": "Scan interval (seconds)",
+          "date_format": "Date format (strftime)",
+          "local_time": "Convert dates to local time"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This feed URL is already configured."
+    }
+  }
+}

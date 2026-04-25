@@ -1,0 +1,12 @@
+{
+  "domain": "fast_news_reader",
+  "name": "Fast News Reader",
+  "version": "0.1.0",
+  "documentation": "https://github.com/fastender/fast-news-reader",
+  "issue_tracker": "https://github.com/fastender/fast-news-reader/issues",
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "requirements": ["feedparser>=6.0.10", "beautifulsoup4>=4.12.0"],
+  "dependencies": [],
+  "codeowners": ["@fastender"]
+}
