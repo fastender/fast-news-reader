@@ -5,16 +5,19 @@
  *
  * Card config:
  *   type: custom:fast-news-reader-card
- *   entities: [sensor.tagesschau, sensor.heise]   # multi-source supported
+ *   entities:
+ *     - sensor.tagesschau                          # bare string: take all entries
+ *     - entity: sensor.heise                        # object form: cap per-feed
+ *       max_items: 3
  *   # entity: sensor.tagesschau                    # legacy single source still works
- *   max_items: 5
+ *   max_items: 5                                    # global cap on the merged list
  *   show_image: true
  *   show_summary: true
  *   show_date: true
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.8.3";
+const CARD_VERSION = "0.8.4";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -122,6 +125,42 @@ function articleId(entry) {
   return entry.id || entry.link || entry.title || "";
 }
 
+function entryDate(e) {
+  return new Date(e.published_dt || e.published || 0).getTime() || 0;
+}
+
+// Accepts a YAML feed entry — bare string or {entity, max_items} object —
+// and returns the canonical {entity, max_items?} shape, or null if invalid.
+function normalizeFeed(raw) {
+  if (typeof raw === "string") return { entity: raw };
+  if (raw && typeof raw === "object" && typeof raw.entity === "string") {
+    const out = { entity: raw.entity };
+    const n = parseInt(raw.max_items, 10);
+    if (Number.isFinite(n) && n > 0) out.max_items = n;
+    return out;
+  }
+  return null;
+}
+
+function normalizeFeeds(rawList) {
+  const seen = new Set();
+  const out = [];
+  for (const item of rawList || []) {
+    const f = normalizeFeed(item);
+    if (!f || seen.has(f.entity)) continue;
+    seen.add(f.entity);
+    out.push(f);
+  }
+  return out;
+}
+
+// Compact YAML form: bare string when only `entity` is set, object otherwise.
+function serializeFeeds(feeds) {
+  return (feeds || []).map((f) =>
+    f.max_items != null ? { entity: f.entity, max_items: f.max_items } : f.entity
+  );
+}
+
 // ===========================================================================
 // Per-article actions, stored in localStorage. Card and modal both read
 // this; they listen for "fnr:state-changed" so any action propagates.
@@ -195,7 +234,14 @@ const EDITOR_STYLES = `
     display: flex; gap: 6px; align-items: center;
     margin-bottom: 6px;
   }
-  .feed-row select { flex: 1; }
+  .feed-row select { flex: 1; min-width: 0; }
+  .feed-row input.max-input {
+    flex: 0 0 64px;
+    text-align: center;
+    padding: 8px 6px;
+  }
+  .feed-row input.max-input::-webkit-outer-spin-button,
+  .feed-row input.max-input::-webkit-inner-spin-button { margin: 0; }
   .icon-btn {
     flex: 0 0 36px;
     width: 36px; height: 36px;
@@ -251,16 +297,23 @@ class FastNewsReaderCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    // Normalize legacy `entity` to `entities` array for the editor and
-    // collapse any duplicates a hand-edited YAML may contain.
+    // Editor works with the canonical {entity, max_items?} shape; YAML may
+    // contain bare strings, objects, or the legacy single `entity`.
     const cfg = { ...config };
-    if (!cfg.entities && cfg.entity) cfg.entities = [cfg.entity];
-    if (!cfg.entities) cfg.entities = [];
-    cfg.entities = [...new Set(cfg.entities)];
+    const raw = cfg.entities ? [...cfg.entities] : cfg.entity ? [cfg.entity] : [];
+    cfg.entities = normalizeFeeds(raw);
     delete cfg.entity;
+    const prevKey = JSON.stringify(this._config?.entities || []);
+    const nextKey = JSON.stringify(cfg.entities);
     this._config = cfg;
-    if (this._rendered) this._fill();
-    else this._render();
+    if (this._rendered) {
+      this._fillSimpleFields();
+      // Skip re-rendering rows when HA echoes our own emit back — keeps
+      // focus on the per-feed max input while the user is typing.
+      if (prevKey !== nextKey) this._renderFeedRows();
+    } else {
+      this._render();
+    }
   }
 
   set hass(hass) {
@@ -270,9 +323,13 @@ class FastNewsReaderCardEditor extends HTMLElement {
   }
 
   _emit() {
+    const out = {
+      ...this._config,
+      entities: serializeFeeds(this._config.entities),
+    };
     this.dispatchEvent(
       new CustomEvent("config-changed", {
-        detail: { config: this._config },
+        detail: { config: out },
         bubbles: true,
         composed: true,
       })
@@ -323,12 +380,12 @@ class FastNewsReaderCardEditor extends HTMLElement {
 
     this.querySelector("#fnr-add").addEventListener("click", () => {
       const ids = this._availableEntities();
-      const taken = new Set(this._config.entities || []);
+      const taken = new Set((this._config.entities || []).map((f) => f.entity));
       const next = ids.find((i) => !taken.has(i));
       if (!next) return;
       this._config = {
         ...this._config,
-        entities: [...(this._config.entities || []), next],
+        entities: [...(this._config.entities || []), { entity: next }],
       };
       this._renderFeedRows();
       this._emit();
@@ -378,9 +435,10 @@ class FastNewsReaderCardEditor extends HTMLElement {
     }
 
     const takenByOthers = (idx) =>
-      new Set(entities.filter((_, i) => i !== idx));
+      new Set(entities.filter((_, i) => i !== idx).map((f) => f.entity));
 
-    entities.forEach((current, idx) => {
+    entities.forEach((feed, idx) => {
+      const current = feed.entity;
       const row = document.createElement("div");
       row.className = "feed-row";
 
@@ -398,9 +456,33 @@ class FastNewsReaderCardEditor extends HTMLElement {
       select.value = current || "";
       select.addEventListener("change", (e) => {
         const next = [...(this._config.entities || [])];
-        next[idx] = e.target.value;
+        next[idx] = { ...next[idx], entity: e.target.value };
         this._config = { ...this._config, entities: next };
         this._renderFeedRows();
+        this._emit();
+      });
+
+      const maxInput = document.createElement("input");
+      maxInput.type = "number";
+      maxInput.className = "max-input";
+      maxInput.min = "1";
+      maxInput.max = "200";
+      maxInput.step = "1";
+      maxInput.placeholder = "all";
+      maxInput.title = "Max items from this feed (empty = all)";
+      maxInput.value = feed.max_items != null ? String(feed.max_items) : "";
+      maxInput.addEventListener("input", (e) => {
+        const v = e.target.value.trim();
+        const n = parseInt(v, 10);
+        const next = [...(this._config.entities || [])];
+        const updated = { ...next[idx] };
+        if (v === "" || !Number.isFinite(n) || n <= 0) {
+          delete updated.max_items;
+        } else {
+          updated.max_items = n;
+        }
+        next[idx] = updated;
+        this._config = { ...this._config, entities: next };
         this._emit();
       });
 
@@ -417,13 +499,15 @@ class FastNewsReaderCardEditor extends HTMLElement {
       });
 
       row.appendChild(select);
+      row.appendChild(maxInput);
       row.appendChild(remove);
       container.appendChild(row);
     });
 
     const addBtn = this.querySelector("#fnr-add");
     if (addBtn) {
-      const remaining = ids.filter((id) => !entities.includes(id));
+      const used = new Set(entities.map((f) => f.entity));
+      const remaining = ids.filter((id) => !used.has(id));
       addBtn.disabled = remaining.length === 0;
       addBtn.title = addBtn.disabled
         ? "All available feeds are already added"
@@ -444,11 +528,6 @@ class FastNewsReaderCardEditor extends HTMLElement {
     q("#fnr-img").checked = this._config.show_image !== false;
     q("#fnr-sum").checked = this._config.show_summary !== false;
     q("#fnr-date").checked = this._config.show_date !== false;
-  }
-
-  _fill() {
-    this._fillSimpleFields();
-    this._renderFeedRows();
   }
 }
 
@@ -511,9 +590,10 @@ const MODAL_STYLES = `
     color: var(--primary-text-color, #f0f0f0);
     cursor: pointer; font-size: 16px; line-height: 1;
     display: flex; align-items: center; justify-content: center;
-    transition: background-color 120ms ease, color 120ms ease;
+    transition: transform 120ms ease, color 120ms ease;
   }
-  .action-btn:hover { background: var(--divider-color, rgba(255,255,255,0.18)); }
+  .action-btn:hover { transform: scale(1.12); }
+  .action-btn:active { transform: scale(1.0); }
   .action-btn[data-active="true"] { color: var(--primary-color, #FF6B4A); }
   .action-btn.close { font-size: 20px; }
 
@@ -936,20 +1016,20 @@ class FastNewsReaderCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("config required");
-    // Normalize legacy `entity` to `entities` array, de-duped so a feed
-    // listed twice is treated as one source.
+    // Accept bare strings, {entity, max_items} objects, the legacy single
+    // `entity`, or any mix; normalize to canonical objects and de-dupe.
     const rawEntities = config.entities
       ? [...config.entities]
       : config.entity
       ? [config.entity]
       : [];
-    const entities = [...new Set(rawEntities)];
-    if (!entities.length) {
+    const feeds = normalizeFeeds(rawEntities);
+    if (!feeds.length) {
       throw new Error("at least one entity is required");
     }
-    for (const id of entities) {
-      if (!id.startsWith("sensor.")) {
-        throw new Error(`entity must be a sensor: ${id}`);
+    for (const f of feeds) {
+      if (!f.entity.startsWith("sensor.")) {
+        throw new Error(`entity must be a sensor: ${f.entity}`);
       }
     }
     this._config = {
@@ -958,7 +1038,7 @@ class FastNewsReaderCard extends HTMLElement {
       show_summary: true,
       show_date: true,
       ...config,
-      entities,
+      entities: feeds,
     };
     delete this._config.entity;
     this._lastStateStamp = null;
@@ -977,9 +1057,12 @@ class FastNewsReaderCard extends HTMLElement {
   _stampForEntities() {
     if (!this._hass || !this._config) return "missing";
     return (this._config.entities || [])
-      .map((id) => {
-        const s = this._hass.states[id];
-        return s ? `${id}:${s.state}:${s.last_updated}` : `${id}:missing`;
+      .map((f) => {
+        const s = this._hass.states[f.entity];
+        const cap = f.max_items != null ? f.max_items : "_";
+        return s
+          ? `${f.entity}:${cap}:${s.state}:${s.last_updated}`
+          : `${f.entity}:missing`;
       })
       .join("|");
   }
@@ -993,24 +1076,27 @@ class FastNewsReaderCard extends HTMLElement {
     const hidden = ArticleStore.load("hidden");
     const all = [];
     const byEntity = {};
-    for (const id of this._config.entities) {
+    const sortDesc = (a, b) => entryDate(b) - entryDate(a);
+    for (const feed of this._config.entities) {
+      const id = feed.entity;
       const stateObj = this._hass.states[id];
       if (!stateObj) continue;
       const channel = stateObj.attributes.channel || {};
       const sourceTitle = channel.title || stateObj.attributes.friendly_name || id;
       byEntity[id] = sourceTitle;
-      const entries = stateObj.attributes.entries || [];
-      for (const e of entries) {
-        if (hidden.has(articleId(e))) continue;
+      const entries = (stateObj.attributes.entries || [])
+        .filter((e) => !hidden.has(articleId(e)));
+      // Apply per-feed cap to the newest N (sort first so the cap is stable
+      // regardless of source ordering).
+      const limited =
+        feed.max_items != null
+          ? [...entries].sort(sortDesc).slice(0, feed.max_items)
+          : entries;
+      for (const e of limited) {
         all.push({ ...e, _entityId: id, _sourceTitle: sourceTitle });
       }
     }
-    // Sort by published_dt (or published string) desc.
-    all.sort((a, b) => {
-      const ta = new Date(a.published_dt || a.published || 0).getTime() || 0;
-      const tb = new Date(b.published_dt || b.published || 0).getTime() || 0;
-      return tb - ta;
-    });
+    all.sort(sortDesc);
     return { entries: all, byEntity };
   }
 
@@ -1045,7 +1131,7 @@ class FastNewsReaderCard extends HTMLElement {
     const headerTitle =
       this._config.title ||
       (this._config.entities.length === 1
-        ? byEntity[this._config.entities[0]] || ""
+        ? byEntity[this._config.entities[0].entity] || ""
         : "Feeds");
     const isMulti = this._config.entities.length > 1;
     const favorites = ArticleStore.load("favorite");
