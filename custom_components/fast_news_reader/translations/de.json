@@ -34,6 +34,15 @@
           "date_format": "Datumsformat (fortgeschritten — strftime)",
           "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
         }
+      },
+      "reconfigure": {
+        "title": "Feed bearbeiten",
+        "description": "Ändere den Namen oder tausche die Feed-URL. Wir prüfen die neue URL kurz, bevor wir speichern.",
+        "data": {
+          "name": "Anzeigename",
+          "feed_url": "Feed-URL",
+          "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)"
+        }
       }
     },
     "error": {
@@ -46,7 +55,9 @@
     },
     "abort": {
       "already_configured": "Diesen Feed hast du bereits hinzugefügt.",
-      "no_presets_left": "Du hast schon alle kuratierten Feeds dieser Region hinzugefügt. Füge eine eigene URL hinzu oder wähle eine andere Region."
+      "no_presets_left": "Du hast schon alle kuratierten Feeds dieser Region hinzugefügt. Füge eine eigene URL hinzu oder wähle eine andere Region.",
+      "reconfigure_url_taken": "Eine andere Feed-Konfiguration nutzt diese URL bereits.",
+      "reconfigure_successful": "Feed aktualisiert."
     }
   },
   "options": {

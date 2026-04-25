@@ -34,6 +34,15 @@
           "date_format": "Date format (advanced — strftime)",
           "local_time": "Show dates in your local timezone"
         }
+      },
+      "reconfigure": {
+        "title": "Edit this feed",
+        "description": "Change the name or swap the feed URL. We'll verify the new URL before saving.",
+        "data": {
+          "name": "Display name",
+          "feed_url": "Feed URL",
+          "scan_interval": "How often should we check for updates? (seconds)"
+        }
       }
     },
     "error": {
@@ -46,7 +55,9 @@
     },
     "abort": {
       "already_configured": "You've already added this feed.",
-      "no_presets_left": "You've already added every curated feed for this region. Add a custom URL or pick another region."
+      "no_presets_left": "You've already added every curated feed for this region. Add a custom URL or pick another region.",
+      "reconfigure_url_taken": "Another feed entry already uses that URL.",
+      "reconfigure_successful": "Feed updated."
     }
   },
   "options": {

@@ -25,9 +25,11 @@ This integration covers all five common image sources, so your news card actuall
 
 ## ✨ What you get
 
-- 📰 **Feedly-style discovery** — pick a feed from a curated dropdown, no URL hunting required
+- 📰 **Feedly-style discovery** — pick from a curated dropdown filtered by region (DE / EN), or paste a custom URL
 - 🖼️ **Images that actually show up** — five-path extractor, including the `<content:encoded>` gap
-- ⚙️ **Edit anytime** — change refresh interval, date format, locale without re-adding the feed
+- 🎴 **Lovelace card included** — `custom:fast-news-reader-card` ships with the integration, no separate install
+- 🧩 **One Device per feed** — main count sensor + `latest_title` / `latest_image` / `latest_published` sub-sensors, ready for templates and dashboards
+- ⚙️ **Edit anytime** — reconfigure the URL, rename the feed, change refresh interval — without re-adding
 - 🌐 **Drop-in compatible** — same sensor schema as `timmaurice/feedparser`, existing Lovelace cards keep working
 - 🇩🇪 **DE + EN translations** — friendly, conversational UI copy
 
@@ -38,6 +40,22 @@ This integration covers all five common image sources, so your news card actuall
 3. Install, restart Home Assistant
 4. **Settings → Devices & Services → Add Integration → "Fast News Reader"**
 5. Pick a feed from the list — done.
+
+## 🎴 Lovelace card
+
+A custom card ships inside the integration and registers itself automatically — no manual resource step. Add it to any dashboard:
+
+```yaml
+type: custom:fast-news-reader-card
+entity: sensor.tagesschau
+max_items: 5            # default 5
+show_image: true        # default true
+show_summary: true      # default true
+show_date: true         # default true (relative timestamp)
+title: "Tagesschau"     # optional, defaults to the channel title
+```
+
+The card renders a Feedly-style stack of articles with image, title, summary, and a relative timestamp (`2 hours ago`). Clicking an article opens the source URL in a new tab. Theme-aware via HA CSS variables — looks at home in light and dark modes.
 
 ## 📊 Sensor schema
 

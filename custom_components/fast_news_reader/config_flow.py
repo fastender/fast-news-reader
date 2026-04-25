@@ -257,6 +257,66 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="custom", data_schema=schema, errors=errors
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit name + feed URL of an existing entry without removing it.
+
+        HA shows this as a 'Reconfigure' button alongside 'Configure' on the
+        integration card. The unique_id is updated to the new URL so duplicate
+        detection keeps working after a swap.
+        """
+        entry = self._get_reconfigure_entry()
+        current = {**entry.data, **entry.options}
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            url = user_input[CONF_FEED_URL].strip()
+            user_input[CONF_FEED_URL] = url
+
+            if user_input[CONF_SCAN_INTERVAL] < MIN_SCAN_INTERVAL:
+                errors[CONF_SCAN_INTERVAL] = "interval_too_short"
+
+            if not errors:
+                # Allow URL to stay the same; abort only if it collides with a
+                # different entry's unique_id.
+                if url != current.get(CONF_FEED_URL):
+                    await self.async_set_unique_id(url)
+                    self._abort_if_unique_id_mismatch(reason="reconfigure_url_taken")
+                if err := await _validate_feed(self.hass, url):
+                    errors[CONF_FEED_URL] = err
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        title=user_input[CONF_NAME],
+                        data={**current, **user_input},
+                        unique_id=url,
+                    )
+
+        defaults = user_input or current
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_NAME,
+                    default=defaults.get(CONF_NAME, ""),
+                ): str,
+                vol.Required(
+                    CONF_FEED_URL,
+                    default=defaults.get(CONF_FEED_URL, ""),
+                ): str,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=defaults.get(
+                        CONF_SCAN_INTERVAL,
+                        int(DEFAULT_SCAN_INTERVAL.total_seconds()),
+                    ),
+                ): int,
+            }
+        )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema, errors=errors
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(
