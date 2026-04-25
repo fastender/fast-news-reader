@@ -117,30 +117,52 @@ def get_preset(slug: str) -> Preset | None:
     return None
 
 
-def preset_options_for_language(
+def available_categories_for_language(
     language: Language,
     excluded_urls: set[str] | None = None,
-) -> list[dict[str, str]]:
-    """SelectSelector options for a single language, excluding URLs already configured.
+) -> list[tuple[str, int]]:
+    """Categories that still have at least one feed left for this language.
 
-    Order: by category (CATEGORY_LABELS order), then by insertion order within category.
+    Returns [(category_slug, count_remaining), ...] in CATEGORY_LABELS order.
+    """
+    excluded = excluded_urls or set()
+    counts: dict[str, int] = {cat: 0 for cat in CATEGORY_LABELS}
+    for preset in PRESETS:
+        if preset["language"] != language:
+            continue
+        if preset["url"] in excluded:
+            continue
+        counts[preset["category"]] += 1
+    return [(cat, n) for cat, n in counts.items() if n > 0]
+
+
+def preset_options_for_language(
+    language: Language,
+    category: str | None = None,
+    excluded_urls: set[str] | None = None,
+) -> list[dict[str, str]]:
+    """SelectSelector options, filtered by language and optionally by category.
+
+    When `category` is given, the category prefix is dropped from labels (it's
+    redundant since the user already picked the topic). When None, every label
+    is prefixed with its category for context.
+
+    Order: CATEGORY_LABELS order, then insertion order within each category.
     """
     excluded = excluded_urls or set()
     by_cat: dict[str, list[Preset]] = {}
     for preset in PRESETS:
         if preset["language"] != language:
             continue
+        if category and preset["category"] != category:
+            continue
         if preset["url"] in excluded:
             continue
         by_cat.setdefault(preset["category"], []).append(preset)
 
     options: list[dict[str, str]] = []
-    for category, label in CATEGORY_LABELS.items():
-        for preset in by_cat.get(category, []):
-            options.append(
-                {
-                    "value": preset["slug"],
-                    "label": f"{label}: {preset['name']}",
-                }
-            )
+    for cat, label in CATEGORY_LABELS.items():
+        for preset in by_cat.get(cat, []):
+            display = preset["name"] if category else f"{label}: {preset['name']}"
+            options.append({"value": preset["slug"], "label": display})
     return options

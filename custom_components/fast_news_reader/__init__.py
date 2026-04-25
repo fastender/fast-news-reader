@@ -8,6 +8,7 @@ from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .coordinator import FastNewsReaderCoordinator
@@ -20,10 +21,20 @@ CARD_URL_PATH = f"/{DOMAIN}/{CARD_FILENAME}"
 _CARD_REGISTERED_FLAG = f"{DOMAIN}_card_registered"
 
 
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Run once at HA startup, before any config entries are loaded.
+
+    Registering the Lovelace card here means it's available even if every
+    feed entry fails to fetch. add_extra_js_url has to be called before the
+    frontend serves its first page for the script to appear in the global
+    customCards list, so doing it from setup_entry is too late on a fresh boot.
+    """
+    await _async_register_card(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Fast News Reader from a config entry."""
-    await _async_register_card(hass)
-
     coordinator = FastNewsReaderCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
@@ -61,4 +72,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     )
     add_extra_js_url(hass, CARD_URL_PATH)
     hass.data[_CARD_REGISTERED_FLAG] = True
-    _LOGGER.debug("Registered Lovelace card at %s", CARD_URL_PATH)
+    _LOGGER.info(
+        "Registered Lovelace card at %s (hard-reload the browser to pick it up)",
+        CARD_URL_PATH,
+    )

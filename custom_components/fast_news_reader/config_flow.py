@@ -18,6 +18,8 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CATEGORY_ALL,
+    CONF_CATEGORY,
     CONF_DATE_FORMAT,
     CONF_FEED_URL,
     CONF_LANGUAGE,
@@ -33,8 +35,10 @@ from .const import (
     MIN_SCAN_INTERVAL,
 )
 from .presets import (
+    CATEGORY_LABELS,
     LANGUAGE_LABELS,
     Language,
+    available_categories_for_language,
     get_preset,
     preset_options_for_language,
 )
@@ -69,6 +73,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._language: Language | None = None
+        self._category: str | None = None  # None == "all"
         self._scan_interval: int = int(DEFAULT_SCAN_INTERVAL.total_seconds())
 
     def _existing_urls(self) -> set[str]:
@@ -94,7 +99,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._language = user_input[CONF_LANGUAGE]
             self._scan_interval = user_input[CONF_SCAN_INTERVAL]
-            return await self.async_step_preset_select()
+            return await self.async_step_preset_topic()
 
         schema = vol.Schema(
             {
@@ -117,14 +122,60 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="preset_language", data_schema=schema
         )
 
+    async def async_step_preset_topic(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Topic picker. Only categories with feeds left for the chosen language."""
+        assert self._language is not None
+        excluded = self._existing_urls()
+        available = available_categories_for_language(self._language, excluded)
+
+        if not available:
+            return self.async_abort(reason="no_presets_left")
+
+        if user_input is not None:
+            chosen = user_input[CONF_CATEGORY]
+            self._category = None if chosen == CATEGORY_ALL else chosen
+            return await self.async_step_preset_select()
+
+        options: list[dict[str, str]] = []
+        # "Alles" only makes sense if multiple categories exist.
+        if len(available) > 1:
+            total = sum(n for _, n in available)
+            options.append({"value": CATEGORY_ALL, "label": f"Alles ({total})"})
+        for cat, count in available:
+            options.append(
+                {"value": cat, "label": f"{CATEGORY_LABELS[cat]} ({count})"}
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_CATEGORY, default=options[0]["value"]
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=options,
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="preset_topic",
+            data_schema=schema,
+            description_placeholders={"language": LANGUAGE_LABELS[self._language]},
+        )
+
     async def async_step_preset_select(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Multi-select dropdown, already-configured feeds are filtered out."""
+        """Final multi-select. LIST mode. Already-configured feeds filtered out."""
         assert self._language is not None
         errors: dict[str, str] = {}
         excluded_urls = self._existing_urls()
-        options = preset_options_for_language(self._language, excluded_urls)
+        options = preset_options_for_language(
+            self._language, self._category, excluded_urls
+        )
 
         if not options:
             return self.async_abort(reason="no_presets_left")
@@ -171,12 +222,15 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         },
                     )
 
+        topic_label = (
+            CATEGORY_LABELS[self._category] if self._category else "Alles"
+        )
         schema = vol.Schema(
             {
                 vol.Required(CONF_PRESETS, default=[]): SelectSelector(
                     SelectSelectorConfig(
                         options=options,
-                        mode=SelectSelectorMode.DROPDOWN,
+                        mode=SelectSelectorMode.LIST,
                         multiple=True,
                         sort=False,
                     )
@@ -189,6 +243,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "language": LANGUAGE_LABELS[self._language],
+                "topic": topic_label,
                 "available": str(len(options)),
             },
         )

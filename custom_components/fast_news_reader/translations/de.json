@@ -17,9 +17,16 @@
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)"
         }
       },
+      "preset_topic": {
+        "title": "Thema wählen",
+        "description": "Stöbere durch {language}-Feeds nach Thema, oder wähle \"Alles\" für die komplette Liste.",
+        "data": {
+          "category": "Thema"
+        }
+      },
       "preset_select": {
         "title": "Feeds auswählen",
-        "description": "Wähle einen oder mehrere Feeds aus. Jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir hier aus.\n\n{available} Feeds verfügbar für {language}.",
+        "description": "{available} {topic}-Feed(s) auf {language}. Wähle einen oder mehrere aus. Jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir aus.",
         "data": {
           "presets": "Feeds"
         }

@@ -17,9 +17,16 @@
           "scan_interval": "How often should we check for updates? (seconds)"
         }
       },
+      "preset_topic": {
+        "title": "Pick a topic",
+        "description": "Browse {language} feeds by topic, or pick \"Alles\" to see them all in one list.",
+        "data": {
+          "category": "Topic"
+        }
+      },
       "preset_select": {
         "title": "Pick your feeds",
-        "description": "Select one or more feeds. Each one is added as its own device. Feeds you've already added are hidden from this list.\n\n{available} feeds available in {language}.",
+        "description": "{available} {topic} feed(s) in {language}. Select one or more. Each becomes its own device. Feeds you've already added are hidden.",
         "data": {
           "presets": "Feeds"
         }

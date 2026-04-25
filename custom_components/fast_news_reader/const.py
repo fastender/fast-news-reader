@@ -13,6 +13,8 @@ CONF_LOCAL_TIME = "local_time"
 CONF_PRESET = "preset"
 CONF_PRESETS = "presets"
 CONF_LANGUAGE = "language"
+CONF_CATEGORY = "category"
+CATEGORY_ALL = "all"
 
 DEFAULT_SCAN_INTERVAL = timedelta(hours=1)
 DEFAULT_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S%z"

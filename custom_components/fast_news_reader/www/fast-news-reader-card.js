@@ -15,7 +15,7 @@
  *   title: "My news"        # optional, defaults to channel.title
  */
 
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.6.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
