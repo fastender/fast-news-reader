@@ -16,7 +16,7 @@
  *   title: "My news"        # optional, defaults to channel.title
  */
 
-const CARD_VERSION = "0.7.2";
+const CARD_VERSION = "0.7.3";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -101,91 +101,205 @@ function absoluteDate(iso, locale) {
 }
 
 // ===========================================================================
-// 1) Visual editor — defined FIRST so getConfigElement always finds it.
-//    Uses light DOM so HA's <ha-form> styling/event flow works out of the box.
+// 1) Visual editor - defined FIRST so getConfigElement always finds it.
+//    Plain HTML form, no <ha-form> dependency. ha-form is only loaded after
+//    the user has visited certain HA routes; relying on it makes the editor
+//    silently fail for fresh sessions. Plain inputs work everywhere.
 // ===========================================================================
 
-const EDITOR_SCHEMA = [
-  {
-    name: "entity",
-    required: true,
-    selector: {
-      entity: { domain: "sensor", integration: "fast_news_reader" },
-    },
-  },
-  { name: "title", selector: { text: {} } },
-  {
-    name: "max_items",
-    default: 5,
-    selector: { number: { min: 1, max: 50, mode: "box", step: 1 } },
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "show_image", default: true, selector: { boolean: {} } },
-      { name: "show_summary", default: true, selector: { boolean: {} } },
-      { name: "show_date", default: true, selector: { boolean: {} } },
-    ],
-  },
-];
-
-const EDITOR_LABELS = {
-  entity: "Feed (sensor entity)",
-  title: "Title (optional, defaults to channel)",
-  max_items: "Max items shown",
-  show_image: "Show image",
-  show_summary: "Show summary",
-  show_date: "Show relative date",
-};
+const EDITOR_STYLES = `
+  :host, :scope { display: block; }
+  .editor-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .editor-row label {
+    font-size: 0.85rem;
+    color: var(--secondary-text-color, #666);
+    font-weight: 500;
+  }
+  .editor-row input[type="text"],
+  .editor-row input[type="number"],
+  .editor-row select {
+    background: var(--card-background-color, #fff);
+    color: var(--primary-text-color, #1a1a1a);
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .editor-row input[type="text"]:focus,
+  .editor-row input[type="number"]:focus,
+  .editor-row select:focus {
+    outline: none;
+    border-color: var(--primary-color, #FF6B4A);
+  }
+  .toggles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    user-select: none;
+  }
+  .toggle input { margin: 0; cursor: pointer; }
+  .hint {
+    font-size: 0.78rem;
+    color: var(--secondary-text-color, #888);
+  }
+`;
 
 class FastNewsReaderCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
-    this._initialized = false;
+    this._rendered = false;
   }
 
   setConfig(config) {
     this._config = { ...config };
-    this._render();
+    if (this._rendered) this._fill();
+    else this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    if (this._rendered) this._refreshEntityOptions();
+    else this._render();
+  }
+
+  _emit() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  _availableEntities() {
+    if (!this._hass) return [];
+    return Object.keys(this._hass.states)
+      .filter(
+        (id) =>
+          id.startsWith("sensor.") &&
+          this._hass.states[id]?.attributes?.entries !== undefined
+      )
+      .sort();
   }
 
   _render() {
-    if (!this._hass || !this._config) return;
+    if (!this._hass) return;
 
-    if (!this._initialized) {
-      this.innerHTML = "";
-      const form = document.createElement("ha-form");
-      form.addEventListener("value-changed", (ev) => {
-        ev.stopPropagation();
-        this._config = ev.detail.value;
-        this.dispatchEvent(
-          new CustomEvent("config-changed", {
-            detail: { config: this._config },
-            bubbles: true,
-            composed: true,
-          })
-        );
-      });
-      this.appendChild(form);
-      this._initialized = true;
+    this.innerHTML = `
+      <style>${EDITOR_STYLES}</style>
+      <div class="editor-row">
+        <label for="fnr-entity">Feed</label>
+        <select id="fnr-entity"></select>
+        <span class="hint">Pick a Fast News Reader sensor.</span>
+      </div>
+      <div class="editor-row">
+        <label for="fnr-title">Title (optional)</label>
+        <input id="fnr-title" type="text" placeholder="Defaults to the feed's channel title">
+      </div>
+      <div class="editor-row">
+        <label for="fnr-max">Max items shown</label>
+        <input id="fnr-max" type="number" min="1" max="50" step="1">
+      </div>
+      <div class="editor-row">
+        <label>Show in card</label>
+        <div class="toggles">
+          <label class="toggle"><input id="fnr-img" type="checkbox"> Image</label>
+          <label class="toggle"><input id="fnr-sum" type="checkbox"> Summary</label>
+          <label class="toggle"><input id="fnr-date" type="checkbox"> Date</label>
+        </div>
+      </div>
+    `;
+
+    this._refreshEntityOptions();
+    this._fill();
+
+    const set = (key, val) => {
+      this._config = { ...this._config, [key]: val };
+      this._emit();
+    };
+
+    this.querySelector("#fnr-entity").addEventListener("change", (e) =>
+      set("entity", e.target.value)
+    );
+    this.querySelector("#fnr-title").addEventListener("input", (e) =>
+      set("title", e.target.value || undefined)
+    );
+    this.querySelector("#fnr-max").addEventListener("input", (e) => {
+      const n = parseInt(e.target.value, 10);
+      set("max_items", isNaN(n) ? 5 : n);
+    });
+    this.querySelector("#fnr-img").addEventListener("change", (e) =>
+      set("show_image", e.target.checked)
+    );
+    this.querySelector("#fnr-sum").addEventListener("change", (e) =>
+      set("show_summary", e.target.checked)
+    );
+    this.querySelector("#fnr-date").addEventListener("change", (e) =>
+      set("show_date", e.target.checked)
+    );
+
+    this._rendered = true;
+  }
+
+  _refreshEntityOptions() {
+    const select = this.querySelector("#fnr-entity");
+    if (!select) return;
+    const ids = this._availableEntities();
+    const current = this._config.entity || "";
+    select.innerHTML = "";
+
+    if (current && !ids.includes(current)) ids.unshift(current);
+    if (!ids.length) ids.push("");
+
+    for (const id of ids) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      const stateObj = this._hass?.states?.[id];
+      const friendly = stateObj?.attributes?.friendly_name;
+      opt.textContent = id ? `${friendly || id} (${id})` : "(no feeds yet)";
+      select.appendChild(opt);
     }
+    select.value = current;
+  }
 
-    const form = this.querySelector("ha-form");
-    form.hass = this._hass;
-    form.data = this._config;
-    form.schema = EDITOR_SCHEMA;
-    form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name;
+  _fill() {
+    const q = (sel) => this.querySelector(sel);
+    if (!q("#fnr-entity")) return;
+    q("#fnr-entity").value = this._config.entity || "";
+    q("#fnr-title").value = this._config.title || "";
+    q("#fnr-max").value =
+      this._config.max_items !== undefined ? this._config.max_items : 5;
+    q("#fnr-img").checked = this._config.show_image !== false;
+    q("#fnr-sum").checked = this._config.show_summary !== false;
+    q("#fnr-date").checked = this._config.show_date !== false;
   }
 }
 
 if (!customElements.get("fast-news-reader-card-editor")) {
-  customElements.define("fast-news-reader-card-editor", FastNewsReaderCardEditor);
+  customElements.define(
+    "fast-news-reader-card-editor",
+    FastNewsReaderCardEditor
+  );
+  console.info("fast-news-reader-card-editor registered");
 }
 
 // ===========================================================================
@@ -510,10 +624,9 @@ class FastNewsReaderCard extends HTMLElement {
     this._lastEntityState = null;
   }
 
-  // HA calls this when opening the card editor. Async + whenDefined makes
-  // the lookup robust even if the editor element was registered after the
-  // card (browser timing edge case on cold reload).
+  // HA calls this when opening the card editor.
   static async getConfigElement() {
+    console.info("[fast-news-reader] getConfigElement called");
     await customElements.whenDefined("fast-news-reader-card-editor");
     return document.createElement("fast-news-reader-card-editor");
   }
@@ -567,6 +680,7 @@ class FastNewsReaderCard extends HTMLElement {
   }
 
   _openModal(index) {
+    console.info("[fast-news-reader] opening modal for index", index);
     const stateObj = this._hass?.states[this._config.entity];
     const entries = stateObj?.attributes?.entries || [];
     const sourceTitle =

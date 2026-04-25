@@ -19,7 +19,6 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["sensor"]
 
 CARD_FILENAME = "fast-news-reader-card.js"
-CARD_URL_PATH = f"/{DOMAIN}/{CARD_FILENAME}"
 _CARD_REGISTERED_FLAG = f"{DOMAIN}_card_registered"
 
 
@@ -89,7 +88,13 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the Lovelace card and add it as an extra frontend module, once per HA boot."""
+    """Serve the Lovelace card and add it as an extra frontend module, once per HA boot.
+
+    The URL contains the integration version as a path segment, so each
+    release is served under a completely different path. Browsers and
+    service workers can't possibly hit a cached copy from the previous
+    version - the URL is new.
+    """
     if hass.data.get(_CARD_REGISTERED_FLAG):
         return
 
@@ -98,14 +103,11 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         _LOGGER.warning("Lovelace card file missing at %s", card_path)
         return
 
+    version = _read_manifest_version()
+    versioned_url = f"/{DOMAIN}/{version}/{CARD_FILENAME}"
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_PATH, str(card_path), False)]
+        [StaticPathConfig(versioned_url, str(card_path), False)]
     )
-    # Append the integration version as a query string so each release
-    # forces the browser to fetch a fresh copy of the JS bundle. Without
-    # this, browsers happily keep serving the cached card from a previous
-    # release and the user wonders why nothing changed.
-    versioned_url = f"{CARD_URL_PATH}?v={_read_manifest_version()}"
     add_extra_js_url(hass, versioned_url)
     hass.data[_CARD_REGISTERED_FLAG] = True
     _LOGGER.info("Registered Lovelace card at %s", versioned_url)
