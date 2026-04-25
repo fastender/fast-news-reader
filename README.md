@@ -9,6 +9,12 @@ A Home Assistant custom integration that turns any RSS/Atom feed into a sensor �
 
 This integration covers all five common image sources, including `<content:encoded>`.
 
+## Documentation
+
+- [Schema reference](docs/SCHEMA.md) — sensor attributes contract for card developers
+- [Image extraction deep-dive](docs/IMAGE_EXTRACTION.md) — why this integration exists, how the 5 paths work
+- [Development guide](docs/DEVELOPMENT.md) — local setup, testing, releasing
+
 ## Schema
 
 Drop-in compatible with `timmaurice/feedparser`:
@@ -45,6 +51,8 @@ sensor.<feed_name>:
 | `local_time` | `false` | Convert UTC → local before formatting |
 
 ## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). TL;DR:
 
 ```bash
 pip install -e ".[dev]"
