@@ -109,6 +109,10 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Credits
+
+RSS and Atom parsing is handled by [`feedparser`](https://github.com/kurtmckee/feedparser), maintained by Kurt McKee under BSD-2-Clause. Originally created by Mark Pilgrim in 2002. Home Assistant Core's own `feedreader` integration uses the same library.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
