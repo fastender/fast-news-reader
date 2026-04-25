@@ -11,6 +11,9 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12+-03A9F4?style=flat-square&logo=home-assistant&logoColor=white)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Works with Fast Search Card](https://img.shields.io/badge/Works%20with-Fast%20Search%20Card-FF6B4A?style=flat-square)](https://github.com/fastender/Fast-Search-Card)
+
+> **Works 100% out of the box with [Fast Search Card](https://github.com/fastender/Fast-Search-Card).** Articles surfaced by Fast News Reader sensors appear in Fast Search Card's results without any extra config.
 
 Add any RSS or Atom feed to Home Assistant in seconds, with proper image extraction including from `<content:encoded>`, the source most other integrations skip. Pick from 20+ hand-picked feeds (Tagesschau, Heise, BBC, The Verge, ...) or paste your own URL.
 
@@ -29,6 +32,7 @@ This integration covers all five common image sources, so news cards actually ha
 - One Device per feed: main count sensor plus `latest_title`, `latest_image`, `latest_published` sub-sensors.
 - Edit anytime: change the feed URL, rename, or adjust the refresh interval without removing the entry.
 - Drop-in compatible with the `timmaurice/feedparser` schema; existing Lovelace cards keep working.
+- 100% compatible with [Fast Search Card](https://github.com/fastender/Fast-Search-Card): articles show up in its results without extra config.
 - DE + EN translations.
 
 ## Install
