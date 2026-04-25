@@ -43,7 +43,7 @@ Via HACS as a custom repository:
 
 ## Lovelace card
 
-The card ships with the integration and registers itself automatically. Add it to any dashboard:
+The card ships with the integration and registers itself automatically. Add it through "Add card", search for "Fast News Reader", and the visual editor appears (entity picker filtered to feed sensors, plus toggles for every option). Or paste the YAML:
 
 ```yaml
 type: custom:fast-news-reader-card
@@ -55,7 +55,7 @@ show_date: true         # default true (relative timestamp)
 title: "Tagesschau"     # optional, defaults to the channel title
 ```
 
-The card shows a stack of articles with image, title, summary, and a relative timestamp. Clicking opens the source URL in a new tab. Theme-aware via HA CSS variables.
+The card shows a stack of articles with image, title, summary, and a relative timestamp. Clicking an article opens a fullscreen reader with the hero image, sanitized HTML content, and a "Quelle öffnen" button to open the source. Use the arrows on the sides (or arrow keys, or swipe on mobile) to flip between articles without leaving the reader. Theme-aware via HA CSS variables.
 
 ## Sensor schema
 
