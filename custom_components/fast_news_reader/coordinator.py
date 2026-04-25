@@ -109,10 +109,25 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "summary": entry.get("summary"),
             "content": content_html,
             "published": self._format_date(entry),
+            "published_dt": self._extract_dt(entry),
             "image": extract_image(entry, self.feed_url),
             "author": entry.get("author"),
             "category": categories or None,
         }
+
+    def _extract_dt(self, entry: Any) -> datetime | None:
+        ts = entry.get("published_parsed") or entry.get("updated_parsed")
+        if not ts:
+            return None
+        return datetime(*ts[:6], tzinfo=UTC)
+
+    @property
+    def latest_entry(self) -> dict[str, Any] | None:
+        """Newest entry, or None if the feed is empty / not yet fetched."""
+        if not self.data:
+            return None
+        entries = self.data.get("entries") or []
+        return entries[0] if entries else None
 
     def _format_date(self, entry: Any) -> str | None:
         ts = entry.get("published_parsed") or entry.get("updated_parsed")

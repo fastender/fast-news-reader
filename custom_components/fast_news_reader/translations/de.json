@@ -5,17 +5,23 @@
         "title": "News-Feed hinzufügen",
         "description": "Wie möchtest du deinen Feed hinzufügen?",
         "menu_options": {
-          "preset": "📰  Aus kuratierten Feeds wählen (empfohlen)",
+          "preset_language": "📰  Aus kuratierten Feeds wählen (empfohlen)",
           "custom": "🔗  Eigene Feed-URL eingeben"
         }
       },
-      "preset": {
-        "title": "Feed auswählen",
-        "description": "Handverlesene Feeds, die mit dieser Integration besonders gut funktionieren. Wähle einen aus — wir prüfen kurz, ob er erreichbar ist.",
+      "preset_language": {
+        "title": "Region wählen",
+        "description": "Wir filtern die Liste auf deine Sprache, damit du nicht durch Feeds scrollen musst, die du nicht liest.",
         "data": {
-          "preset": "Feed",
-          "name": "Anzeigename (optional — leer lassen, um den Feed-Namen zu übernehmen)",
+          "language": "Region / Sprache",
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)"
+        }
+      },
+      "preset_select": {
+        "title": "Feeds auswählen",
+        "description": "Wähle einen oder mehrere Feeds aus — jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir hier aus.\n\n{available} Feeds verfügbar für {language}.",
+        "data": {
+          "presets": "Feeds"
         }
       },
       "custom": {
@@ -35,10 +41,12 @@
       "fetch_failed": "Wir konnten den Feed nicht erreichen. Prüfe die URL und versuche es noch mal.",
       "timeout": "Der Feed hat zu lange gebraucht. Probier's später erneut oder prüfe die URL.",
       "interval_too_short": "Bitte setze das Intervall auf mindestens 60 Sekunden.",
-      "unknown_preset": "Dieser Vorschlag ist nicht mehr verfügbar. Wähle einen anderen."
+      "unknown_preset": "Dieser Vorschlag ist nicht mehr verfügbar. Wähle einen anderen.",
+      "no_selection": "Wähle mindestens einen Feed aus."
     },
     "abort": {
-      "already_configured": "Diesen Feed hast du bereits hinzugefügt."
+      "already_configured": "Diesen Feed hast du bereits hinzugefügt.",
+      "no_presets_left": "Du hast schon alle kuratierten Feeds dieser Region hinzugefügt. Füge eine eigene URL hinzu oder wähle eine andere Region."
     }
   },
   "options": {
@@ -55,6 +63,22 @@
     },
     "error": {
       "interval_too_short": "Bitte setze das Intervall auf mindestens 60 Sekunden."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "latest_title": {
+        "name": "Neuester Titel"
+      },
+      "latest_link": {
+        "name": "Neuester Link"
+      },
+      "latest_image": {
+        "name": "Neuestes Bild"
+      },
+      "latest_published": {
+        "name": "Zuletzt veröffentlicht"
+      }
     }
   }
 }

@@ -40,8 +40,24 @@ Each configured feed becomes one `sensor.<name>` entity. The schema is **drop-in
 | `content` | `str \| None` | Full HTML from `<content:encoded>` if present |
 | `published` | `str \| None` | Formatted per `date_format` config (default ISO 8601) |
 | `image` | `str \| None` | **Absolute** URL extracted via [5 paths](IMAGE_EXTRACTION.md) |
+| `published_dt` | `datetime \| None` | UTC datetime of `published_parsed`/`updated_parsed` (since v0.4.0) |
 | `author` | `str \| None` | |
 | `category` | `list[str] \| None` | Tags / categories |
+
+## Sub-sensors (since v0.4.0)
+
+Each feed becomes a Device. The main count sensor stays the same; four
+additional sensors are created so simple Lovelace cards can avoid templates:
+
+| Entity | Device class | Notes |
+|---|---|---|
+| `<feed>_latest_title` | — | First entry's title |
+| `<feed>_latest_link` | — | URL of the first entry (disabled by default) |
+| `<feed>_latest_image` | — | Image URL — also exposed as `entity_picture` |
+| `<feed>_latest_published` | `timestamp` | Real `datetime` for use with `relative_time()` |
+
+The main count sensor's `unique_id` is unchanged across upgrades — Lovelace
+cards built against v0.3.x keep working. Sub-sensors are additive.
 
 ## Example
 

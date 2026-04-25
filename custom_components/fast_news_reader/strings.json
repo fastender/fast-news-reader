@@ -5,17 +5,23 @@
         "title": "Add a news feed",
         "description": "How would you like to add your feed?",
         "menu_options": {
-          "preset": "📰  Pick from curated feeds (recommended)",
+          "preset_language": "📰  Pick from curated feeds (recommended)",
           "custom": "🔗  Enter a custom feed URL"
         }
       },
-      "preset": {
-        "title": "Choose a feed",
-        "description": "Hand-picked feeds that work well with this integration. Pick one — we'll fetch a sample to make sure it's reachable.",
+      "preset_language": {
+        "title": "Choose your region",
+        "description": "We'll narrow the curated list down so you don't scroll through feeds in a language you don't read.",
         "data": {
-          "preset": "Feed",
-          "name": "Display name (optional — leave blank to use the feed's own name)",
+          "language": "Region / language",
           "scan_interval": "How often should we check for updates? (seconds)"
+        }
+      },
+      "preset_select": {
+        "title": "Pick your feeds",
+        "description": "Select one or more feeds — we'll add each one as its own device. Feeds you've already added are hidden from this list.\n\n{available} feeds available in {language}.",
+        "data": {
+          "presets": "Feeds"
         }
       },
       "custom": {
@@ -35,10 +41,12 @@
       "fetch_failed": "We couldn't reach that feed. Check the URL and try again.",
       "timeout": "The feed took too long to respond. Try again later or check the URL.",
       "interval_too_short": "Please set the interval to at least 60 seconds.",
-      "unknown_preset": "That preset is no longer available. Pick another one."
+      "unknown_preset": "That preset is no longer available. Pick another one.",
+      "no_selection": "Pick at least one feed to continue."
     },
     "abort": {
-      "already_configured": "You've already added this feed."
+      "already_configured": "You've already added this feed.",
+      "no_presets_left": "You've already added every curated feed for this region. Add a custom URL or pick another region."
     }
   },
   "options": {
@@ -55,6 +63,22 @@
     },
     "error": {
       "interval_too_short": "Please set the interval to at least 60 seconds."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "latest_title": {
+        "name": "Latest title"
+      },
+      "latest_link": {
+        "name": "Latest link"
+      },
+      "latest_image": {
+        "name": "Latest image"
+      },
+      "latest_published": {
+        "name": "Latest published"
+      }
     }
   }
 }
