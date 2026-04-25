@@ -1,6 +1,7 @@
 """Fast News Reader integration."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -20,6 +21,14 @@ PLATFORMS = ["sensor"]
 CARD_FILENAME = "fast-news-reader-card.js"
 CARD_URL_PATH = f"/{DOMAIN}/{CARD_FILENAME}"
 _CARD_REGISTERED_FLAG = f"{DOMAIN}_card_registered"
+
+
+def _read_manifest_version() -> str:
+    try:
+        manifest_path = Path(__file__).parent / "manifest.json"
+        return json.loads(manifest_path.read_text()).get("version", "0")
+    except Exception:  # noqa: BLE001
+        return "0"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -92,9 +101,11 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL_PATH, str(card_path), False)]
     )
-    add_extra_js_url(hass, CARD_URL_PATH)
+    # Append the integration version as a query string so each release
+    # forces the browser to fetch a fresh copy of the JS bundle. Without
+    # this, browsers happily keep serving the cached card from a previous
+    # release and the user wonders why nothing changed.
+    versioned_url = f"{CARD_URL_PATH}?v={_read_manifest_version()}"
+    add_extra_js_url(hass, versioned_url)
     hass.data[_CARD_REGISTERED_FLAG] = True
-    _LOGGER.info(
-        "Registered Lovelace card at %s (hard-reload the browser to pick it up)",
-        CARD_URL_PATH,
-    )
+    _LOGGER.info("Registered Lovelace card at %s", versioned_url)

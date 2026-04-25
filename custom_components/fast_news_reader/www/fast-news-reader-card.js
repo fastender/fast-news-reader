@@ -16,7 +16,7 @@
  *   title: "My news"        # optional, defaults to channel.title
  */
 
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.7.2";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -35,8 +35,6 @@ function stripHtml(s) {
   return (tmp.textContent || tmp.innerText || "").trim();
 }
 
-// Allow only a small set of structural tags. Drop scripts, event handlers,
-// and any javascript: URLs. Good enough for RSS-derived HTML.
 const ALLOWED_TAGS = new Set([
   "P", "BR", "B", "I", "STRONG", "EM", "U", "SPAN", "DIV",
   "H1", "H2", "H3", "H4", "H5", "H6",
@@ -102,9 +100,97 @@ function absoluteDate(iso, locale) {
   }).format(t);
 }
 
-// ---------------------------------------------------------------------------
-// Reader modal (Feedly-style overlay, prev/next, keyboard, swipe)
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// 1) Visual editor — defined FIRST so getConfigElement always finds it.
+//    Uses light DOM so HA's <ha-form> styling/event flow works out of the box.
+// ===========================================================================
+
+const EDITOR_SCHEMA = [
+  {
+    name: "entity",
+    required: true,
+    selector: {
+      entity: { domain: "sensor", integration: "fast_news_reader" },
+    },
+  },
+  { name: "title", selector: { text: {} } },
+  {
+    name: "max_items",
+    default: 5,
+    selector: { number: { min: 1, max: 50, mode: "box", step: 1 } },
+  },
+  {
+    type: "grid",
+    schema: [
+      { name: "show_image", default: true, selector: { boolean: {} } },
+      { name: "show_summary", default: true, selector: { boolean: {} } },
+      { name: "show_date", default: true, selector: { boolean: {} } },
+    ],
+  },
+];
+
+const EDITOR_LABELS = {
+  entity: "Feed (sensor entity)",
+  title: "Title (optional, defaults to channel)",
+  max_items: "Max items shown",
+  show_image: "Show image",
+  show_summary: "Show summary",
+  show_date: "Show relative date",
+};
+
+class FastNewsReaderCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = {};
+    this._initialized = false;
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+
+    if (!this._initialized) {
+      this.innerHTML = "";
+      const form = document.createElement("ha-form");
+      form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._config = ev.detail.value;
+        this.dispatchEvent(
+          new CustomEvent("config-changed", {
+            detail: { config: this._config },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+      this.appendChild(form);
+      this._initialized = true;
+    }
+
+    const form = this.querySelector("ha-form");
+    form.hass = this._hass;
+    form.data = this._config;
+    form.schema = EDITOR_SCHEMA;
+    form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name;
+  }
+}
+
+if (!customElements.get("fast-news-reader-card-editor")) {
+  customElements.define("fast-news-reader-card-editor", FastNewsReaderCardEditor);
+}
+
+// ===========================================================================
+// 2) Reader modal (Feedly-style overlay, prev/next, keyboard, swipe)
+// ===========================================================================
 
 const MODAL_STYLES = `
   :host { all: initial; }
@@ -119,10 +205,7 @@ const MODAL_STYLES = `
     font-family: var(--primary-font-family, system-ui, -apple-system, sans-serif);
     color: var(--primary-text-color, #1a1a1a);
   }
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   .panel {
     position: relative;
     background: var(--card-background-color, #fff);
@@ -149,7 +232,6 @@ const MODAL_STYLES = `
     z-index: 2;
   }
   .close:hover { background: var(--divider-color, rgba(0,0,0,0.12)); }
-
   .nav {
     position: fixed; top: 50%; transform: translateY(-50%);
     width: 56px; height: 56px;
@@ -165,7 +247,6 @@ const MODAL_STYLES = `
   .nav:disabled { opacity: 0.35; cursor: default; transform: translateY(-50%); }
   .nav.prev { left: max(16px, calc((100vw - 740px) / 2 - 80px)); }
   .nav.next { right: max(16px, calc((100vw - 740px) / 2 - 80px)); }
-
   .hero {
     width: 100%; height: 360px;
     object-fit: cover;
@@ -173,10 +254,7 @@ const MODAL_STYLES = `
     background: var(--secondary-background-color, #f3f3f3);
   }
   .hero-fallback { height: 0; }
-
-  .body {
-    padding: 24px 28px 32px;
-  }
+  .body { padding: 24px 28px 32px; }
   .source {
     font-size: 0.78rem;
     color: var(--secondary-text-color);
@@ -208,10 +286,7 @@ const MODAL_STYLES = `
     border-radius: 8px;
     margin: 12px 0;
   }
-  .content a {
-    color: var(--primary-color, #FF6B4A);
-    text-decoration: none;
-  }
+  .content a { color: var(--primary-color, #FF6B4A); text-decoration: none; }
   .content a:hover { text-decoration: underline; }
   .visit {
     display: inline-flex; align-items: center; gap: 6px;
@@ -226,7 +301,6 @@ const MODAL_STYLES = `
     transition: filter 120ms ease;
   }
   .visit:hover { filter: brightness(1.06); }
-
   @media (max-width: 600px) {
     .panel { width: 100vw; max-width: 100vw; max-height: 100vh; border-radius: 0; }
     .hero { height: 240px; }
@@ -345,9 +419,9 @@ if (!customElements.get("fast-news-reader-modal")) {
   customElements.define("fast-news-reader-modal", FastNewsReaderModal);
 }
 
-// ---------------------------------------------------------------------------
-// The card itself
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// 3) The card itself
+// ===========================================================================
 
 const CARD_STYLES = `
   :host { display: block; }
@@ -375,10 +449,7 @@ const CARD_STYLES = `
     font-size: 0.9rem;
     text-align: center;
   }
-  .list {
-    display: flex;
-    flex-direction: column;
-  }
+  .list { display: flex; flex-direction: column; }
   .article {
     display: grid;
     grid-template-columns: 96px 1fr;
@@ -389,22 +460,16 @@ const CARD_STYLES = `
     transition: background-color 120ms ease;
     color: inherit;
   }
-  .article:hover {
-    background-color: var(--primary-background-color);
-  }
-  .article.no-image {
-    grid-template-columns: 1fr;
-  }
+  .article:hover { background-color: var(--primary-background-color); }
+  .article.no-image { grid-template-columns: 1fr; }
   .thumb {
-    width: 96px;
-    height: 72px;
+    width: 96px; height: 72px;
     border-radius: 8px;
     object-fit: cover;
     background-color: var(--secondary-background-color);
   }
   .body {
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     justify-content: center;
     gap: 4px;
     min-width: 0;
@@ -445,6 +510,28 @@ class FastNewsReaderCard extends HTMLElement {
     this._lastEntityState = null;
   }
 
+  // HA calls this when opening the card editor. Async + whenDefined makes
+  // the lookup robust even if the editor element was registered after the
+  // card (browser timing edge case on cold reload).
+  static async getConfigElement() {
+    await customElements.whenDefined("fast-news-reader-card-editor");
+    return document.createElement("fast-news-reader-card-editor");
+  }
+
+  static getStubConfig(hass, entities) {
+    const candidate = (entities || []).find(
+      (e) => e.startsWith("sensor.") && hass.states[e]?.attributes?.entries
+    );
+    return {
+      type: "custom:fast-news-reader-card",
+      entity: candidate || "sensor.fast_news_reader",
+      max_items: 5,
+      show_image: true,
+      show_summary: true,
+      show_date: true,
+    };
+  }
+
   setConfig(config) {
     if (!config || !config.entity) {
       throw new Error("entity is required");
@@ -477,24 +564,6 @@ class FastNewsReaderCard extends HTMLElement {
 
   getCardSize() {
     return Math.min(1 + (this._config?.max_items || 5), 8);
-  }
-
-  static getConfigElement() {
-    return document.createElement("fast-news-reader-card-editor");
-  }
-
-  static getStubConfig(hass, entities) {
-    const candidate = (entities || []).find(
-      (e) => e.startsWith("sensor.") && hass.states[e]?.attributes?.entries
-    );
-    return {
-      type: "custom:fast-news-reader-card",
-      entity: candidate || "sensor.fast_news_reader",
-      max_items: 5,
-      show_image: true,
-      show_summary: true,
-      show_date: true,
-    };
   }
 
   _openModal(index) {
@@ -600,107 +669,20 @@ if (!customElements.get("fast-news-reader-card")) {
   customElements.define("fast-news-reader-card", FastNewsReaderCard);
 }
 
-// ---------------------------------------------------------------------------
-// Visual editor — uses HA's <ha-form> for native look + entity picker
-// ---------------------------------------------------------------------------
-
-const EDITOR_SCHEMA = [
-  {
-    name: "entity",
-    required: true,
-    selector: {
-      entity: { domain: "sensor", integration: "fast_news_reader" },
-    },
-  },
-  { name: "title", selector: { text: {} } },
-  {
-    name: "max_items",
-    default: 5,
-    selector: { number: { min: 1, max: 50, mode: "box", step: 1 } },
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "show_image", default: true, selector: { boolean: {} } },
-      { name: "show_summary", default: true, selector: { boolean: {} } },
-      { name: "show_date", default: true, selector: { boolean: {} } },
-    ],
-  },
-];
-
-const EDITOR_LABELS = {
-  entity: "Feed (sensor entity)",
-  title: "Title (optional, defaults to channel)",
-  max_items: "Max items shown",
-  show_image: "Show image",
-  show_summary: "Show summary",
-  show_date: "Show relative date",
-};
-
-class FastNewsReaderCardEditor extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this._config = {};
-  }
-
-  setConfig(config) {
-    this._config = { ...config };
-    this._render();
-  }
-
-  set hass(hass) {
-    this._hass = hass;
-    this._render();
-  }
-
-  _render() {
-    if (!this._hass) return;
-    if (!this.shadowRoot.querySelector("ha-form")) {
-      this.shadowRoot.innerHTML = `
-        <style>
-          :host { display: block; }
-          ha-form { display: block; padding: 4px 0; }
-        </style>
-        <ha-form></ha-form>
-      `;
-      const form = this.shadowRoot.querySelector("ha-form");
-      form.addEventListener("value-changed", (ev) => {
-        this._config = ev.detail.value;
-        this.dispatchEvent(
-          new CustomEvent("config-changed", {
-            detail: { config: this._config },
-            bubbles: true,
-            composed: true,
-          })
-        );
-      });
-    }
-    const form = this.shadowRoot.querySelector("ha-form");
-    form.hass = this._hass;
-    form.data = this._config;
-    form.schema = EDITOR_SCHEMA;
-    form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name;
-  }
-}
-
-if (!customElements.get("fast-news-reader-card-editor")) {
-  customElements.define("fast-news-reader-card-editor", FastNewsReaderCardEditor);
-}
-
-// ---------------------------------------------------------------------------
-// Register with the Lovelace card picker
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// 4) Register with the Lovelace card picker
+// ===========================================================================
 
 window.customCards = window.customCards || [];
-if (!window.customCards.find((c) => c.type === "fast-news-reader-card")) {
-  window.customCards.push({
-    type: "fast-news-reader-card",
-    name: "Fast News Reader",
-    description:
-      "Feedly-style news card with images, titles, and a fullscreen reader on click.",
-    preview: false,
-    documentationURL:
-      "https://github.com/fastender/fast-news-reader#lovelace-card",
-  });
-}
+const idx = window.customCards.findIndex((c) => c.type === "fast-news-reader-card");
+const cardMeta = {
+  type: "fast-news-reader-card",
+  name: "Fast News Reader",
+  description:
+    "Feedly-style news card with images, titles, and a fullscreen reader on click.",
+  preview: false,
+  documentationURL:
+    "https://github.com/fastender/fast-news-reader#lovelace-card",
+};
+if (idx === -1) window.customCards.push(cardMeta);
+else window.customCards[idx] = cardMeta;
