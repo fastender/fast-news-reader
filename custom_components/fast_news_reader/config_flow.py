@@ -12,6 +12,9 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    AreaSelector,
+    AreaSelectorConfig,
+    BooleanSelector,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -19,9 +22,12 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CATEGORY_ALL,
+    CATEGORY_BACK,
+    CONF_AREA,
     CONF_CATEGORY,
     CONF_DATE_FORMAT,
     CONF_FEED_URL,
+    CONF_GO_BACK,
     CONF_LANGUAGE,
     CONF_LOCAL_TIME,
     CONF_NAME,
@@ -75,6 +81,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._language: Language | None = None
         self._category: str | None = None  # None == "all"
         self._scan_interval: int = int(DEFAULT_SCAN_INTERVAL.total_seconds())
+        self._area_id: str | None = None
 
     def _existing_urls(self) -> set[str]:
         return {
@@ -125,7 +132,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_preset_topic(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Topic picker. Only categories with feeds left for the chosen language."""
+        """Topic picker. Last radio option routes back to the language step."""
         assert self._language is not None
         excluded = self._existing_urls()
         available = available_categories_for_language(self._language, excluded)
@@ -135,6 +142,8 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             chosen = user_input[CONF_CATEGORY]
+            if chosen == CATEGORY_BACK:
+                return await self.async_step_preset_language()
             self._category = None if chosen == CATEGORY_ALL else chosen
             return await self.async_step_preset_select()
 
@@ -147,6 +156,8 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             options.append(
                 {"value": cat, "label": f"{CATEGORY_LABELS[cat]} ({count})"}
             )
+        # Back option always last so it doesn't get accidentally clicked first.
+        options.append({"value": CATEGORY_BACK, "label": "← Sprache ändern"})
 
         schema = vol.Schema(
             {
@@ -169,7 +180,11 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_preset_select(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Final multi-select. LIST mode. Already-configured feeds filtered out."""
+        """Final multi-select. LIST mode. Already-configured feeds filtered out.
+
+        Adds an optional area picker that's applied to every device created
+        in this batch, plus a 'go back' toggle to return to the topic step.
+        """
         assert self._language is not None
         errors: dict[str, str] = {}
         excluded_urls = self._existing_urls()
@@ -181,7 +196,12 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_presets_left")
 
         if user_input is not None:
+            if user_input.get(CONF_GO_BACK):
+                return await self.async_step_preset_topic()
+
             selected_slugs: list[str] = user_input[CONF_PRESETS]
+            self._area_id = user_input.get(CONF_AREA) or None
+
             if self._scan_interval < MIN_SCAN_INTERVAL:
                 errors[CONF_SCAN_INTERVAL] = "interval_too_short"
             elif not selected_slugs:
@@ -203,6 +223,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     CONF_NAME: preset["name"],
                                     CONF_FEED_URL: preset["url"],
                                     CONF_SCAN_INTERVAL: self._scan_interval,
+                                    CONF_AREA: self._area_id,
                                 },
                             )
                         )
@@ -219,15 +240,19 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_SCAN_INTERVAL: self._scan_interval,
                             CONF_DATE_FORMAT: DEFAULT_DATE_FORMAT,
                             CONF_LOCAL_TIME: DEFAULT_LOCAL_TIME,
+                            CONF_AREA: self._area_id,
                         },
                     )
 
         topic_label = (
             CATEGORY_LABELS[self._category] if self._category else "Alles"
         )
+        defaults = user_input or {}
         schema = vol.Schema(
             {
-                vol.Required(CONF_PRESETS, default=[]): SelectSelector(
+                vol.Required(
+                    CONF_PRESETS, default=defaults.get(CONF_PRESETS, [])
+                ): SelectSelector(
                     SelectSelectorConfig(
                         options=options,
                         mode=SelectSelectorMode.LIST,
@@ -235,6 +260,10 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         sort=False,
                     )
                 ),
+                vol.Optional(
+                    CONF_AREA, default=defaults.get(CONF_AREA)
+                ): AreaSelector(AreaSelectorConfig()),
+                vol.Optional(CONF_GO_BACK, default=False): BooleanSelector(),
             }
         )
         return self.async_show_form(
@@ -263,6 +292,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 CONF_DATE_FORMAT: DEFAULT_DATE_FORMAT,
                 CONF_LOCAL_TIME: DEFAULT_LOCAL_TIME,
+                CONF_AREA: user_input.get(CONF_AREA),
             },
         )
 

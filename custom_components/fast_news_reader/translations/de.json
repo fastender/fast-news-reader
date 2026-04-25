@@ -28,7 +28,9 @@
         "title": "Feeds auswählen",
         "description": "{available} {topic}-Feed(s) auf {language}. Wähle einen oder mehrere aus. Jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir aus.",
         "data": {
-          "presets": "Feeds"
+          "presets": "Feeds",
+          "area_id": "Bereich (optional, gilt für alle ausgewählten Feeds)",
+          "go_back": "← Zurück zum Thema"
         }
       },
       "custom": {

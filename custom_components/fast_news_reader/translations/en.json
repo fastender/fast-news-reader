@@ -28,7 +28,9 @@
         "title": "Pick your feeds",
         "description": "{available} {topic} feed(s) in {language}. Select one or more. Each becomes its own device. Feeds you've already added are hidden.",
         "data": {
-          "presets": "Feeds"
+          "presets": "Feeds",
+          "area_id": "Area (optional, applied to every selected feed)",
+          "go_back": "← Back to topic"
         }
       },
       "custom": {

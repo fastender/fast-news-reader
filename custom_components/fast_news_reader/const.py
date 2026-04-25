@@ -14,7 +14,10 @@ CONF_PRESET = "preset"
 CONF_PRESETS = "presets"
 CONF_LANGUAGE = "language"
 CONF_CATEGORY = "category"
+CONF_AREA = "area_id"
+CONF_GO_BACK = "go_back"
 CATEGORY_ALL = "all"
+CATEGORY_BACK = "__back__"
 
 DEFAULT_SCAN_INTERVAL = timedelta(hours=1)
 DEFAULT_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S%z"

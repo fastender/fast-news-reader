@@ -8,9 +8,10 @@ from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import CONF_AREA, DOMAIN
 from .coordinator import FastNewsReaderCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,8 +41,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _apply_initial_area(hass, entry)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+def _apply_initial_area(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """One-shot: assign the area chosen during setup to this entry's device.
+
+    Only fires the first time we see the area_id in entry.data; afterwards we
+    clear it so manual area changes by the user aren't overwritten on reload.
+    """
+    area_id = entry.data.get(CONF_AREA)
+    if not area_id:
+        return
+
+    registry = dr.async_get(hass)
+    device = registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    if device is not None and device.area_id != area_id:
+        registry.async_update_device(device.id, area_id=area_id)
+
+    # Strip the marker so subsequent reloads don't re-apply the area.
+    new_data = {k: v for k, v in entry.data.items() if k != CONF_AREA}
+    hass.config_entries.async_update_entry(entry, data=new_data)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
