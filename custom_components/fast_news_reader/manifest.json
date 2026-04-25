@@ -3,7 +3,7 @@
   "name": "Fast News Reader",
   "codeowners": ["@fastender"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["http", "frontend"],
   "documentation": "https://github.com/fastender/fast-news-reader",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/fastender/fast-news-reader/issues",
