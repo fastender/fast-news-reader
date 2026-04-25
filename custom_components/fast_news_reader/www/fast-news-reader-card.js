@@ -14,7 +14,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.8.0";
+const CARD_VERSION = "0.8.3";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -219,6 +219,11 @@ const EDITOR_STYLES = `
     font-size: 0.9rem;
   }
   .add-feed:hover { background: var(--secondary-background-color, rgba(0,0,0,0.04)); }
+  .add-feed:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: transparent;
+  }
   .toggles {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -246,10 +251,12 @@ class FastNewsReaderCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    // Normalize legacy `entity` to `entities` array for the editor.
+    // Normalize legacy `entity` to `entities` array for the editor and
+    // collapse any duplicates a hand-edited YAML may contain.
     const cfg = { ...config };
     if (!cfg.entities && cfg.entity) cfg.entities = [cfg.entity];
     if (!cfg.entities) cfg.entities = [];
+    cfg.entities = [...new Set(cfg.entities)];
     delete cfg.entity;
     this._config = cfg;
     if (this._rendered) this._fill();
@@ -317,7 +324,8 @@ class FastNewsReaderCardEditor extends HTMLElement {
     this.querySelector("#fnr-add").addEventListener("click", () => {
       const ids = this._availableEntities();
       const taken = new Set(this._config.entities || []);
-      const next = ids.find((i) => !taken.has(i)) || ids[0] || "";
+      const next = ids.find((i) => !taken.has(i));
+      if (!next) return;
       this._config = {
         ...this._config,
         entities: [...(this._config.entities || []), next],
@@ -369,12 +377,16 @@ class FastNewsReaderCardEditor extends HTMLElement {
       return;
     }
 
+    const takenByOthers = (idx) =>
+      new Set(entities.filter((_, i) => i !== idx));
+
     entities.forEach((current, idx) => {
       const row = document.createElement("div");
       row.className = "feed-row";
 
       const select = document.createElement("select");
-      const all = [...ids];
+      const blocked = takenByOthers(idx);
+      const all = ids.filter((id) => !blocked.has(id));
       if (current && !all.includes(current)) all.unshift(current);
       for (const id of all) {
         const opt = document.createElement("option");
@@ -388,6 +400,7 @@ class FastNewsReaderCardEditor extends HTMLElement {
         const next = [...(this._config.entities || [])];
         next[idx] = e.target.value;
         this._config = { ...this._config, entities: next };
+        this._renderFeedRows();
         this._emit();
       });
 
@@ -407,6 +420,15 @@ class FastNewsReaderCardEditor extends HTMLElement {
       row.appendChild(remove);
       container.appendChild(row);
     });
+
+    const addBtn = this.querySelector("#fnr-add");
+    if (addBtn) {
+      const remaining = ids.filter((id) => !entities.includes(id));
+      addBtn.disabled = remaining.length === 0;
+      addBtn.title = addBtn.disabled
+        ? "All available feeds are already added"
+        : "";
+    }
   }
 
   _refreshAllSelects() {
@@ -914,12 +936,14 @@ class FastNewsReaderCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("config required");
-    // Normalize legacy `entity` to `entities` array.
-    const entities = config.entities
+    // Normalize legacy `entity` to `entities` array, de-duped so a feed
+    // listed twice is treated as one source.
+    const rawEntities = config.entities
       ? [...config.entities]
       : config.entity
       ? [config.entity]
       : [];
+    const entities = [...new Set(rawEntities)];
     if (!entities.length) {
       throw new Error("at least one entity is required");
     }
