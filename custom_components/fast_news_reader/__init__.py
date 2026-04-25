@@ -47,7 +47,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the Lovelace card and add it as an extra frontend module — once per HA boot."""
+    """Serve the Lovelace card and add it as an extra frontend module, once per HA boot."""
     if hass.data.get(_CARD_REGISTERED_FLAG):
         return
 

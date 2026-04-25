@@ -3,9 +3,9 @@
 Each configured feed becomes a Device in HA, with five sensor entities:
 
 - The main count sensor (state = number of entries, attributes = full
-  channel + entries list — drop-in compatible with the v0.3 schema and
+  channel + entries list, drop-in compatible with the v0.3 schema and
   unique_id-stable across upgrades).
-- `latest_title`, `latest_link`, `latest_image`, `latest_published` —
+- `latest_title`, `latest_link`, `latest_image`, `latest_published` -
   convenience sensors so simple Lovelace cards don't need templates.
 """
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _device_info(coordinator: FastNewsReaderCoordinator, entry: ConfigEntry) -> 
 class FastNewsReaderSensor(
     CoordinatorEntity[FastNewsReaderCoordinator], SensorEntity
 ):
-    """Main count sensor — drop-in compatible with v0.3 schema and unique_id."""
+    """Main count sensor, drop-in compatible with v0.3 schema and unique_id."""
 
     _attr_has_entity_name = False
     _attr_icon = "mdi:rss"
@@ -89,7 +89,7 @@ class FastNewsReaderSensor(
 
 
 class _LatestSensor(CoordinatorEntity[FastNewsReaderCoordinator], SensorEntity):
-    """Shared base for the latest_* convenience sensors — bound to the same Device."""
+    """Shared base for the latest_* convenience sensors, bound to the same Device."""
 
     _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
@@ -121,7 +121,7 @@ class LatestTitleSensor(_LatestSensor):
 class LatestLinkSensor(_LatestSensor):
     _attr_icon = "mdi:link-variant"
     _attr_translation_key = "latest_link"
-    _attr_entity_registry_enabled_default = False  # opt-in — niche, keeps lists clean
+    _attr_entity_registry_enabled_default = False  # opt-in, niche, keeps lists clean
 
     def __init__(self, coordinator: FastNewsReaderCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry, "latest_link")
@@ -133,7 +133,7 @@ class LatestLinkSensor(_LatestSensor):
 
 
 class LatestImageSensor(_LatestSensor):
-    """Latest image URL — also exposed as entity_picture so cards render the thumbnail."""
+    """Latest image URL, also exposed as entity_picture so cards render the thumbnail."""
 
     _attr_icon = "mdi:image-outline"
     _attr_translation_key = "latest_image"

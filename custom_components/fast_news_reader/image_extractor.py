@@ -1,7 +1,7 @@
-"""Multi-source image extractor — the core value of this integration.
+"""Multi-source image extractor, the core value of this integration.
 
 Tries every known RSS image source. Closes the gap left by `core feedreader`
-and `timmaurice/feedparser`, both of which ignore `<content:encoded>` —
+and `timmaurice/feedparser`, both of which ignore `<content:encoded>` -
 the only image source for Tagesschau and many German feeds.
 """
 from __future__ import annotations
@@ -65,7 +65,7 @@ def extract_image(entry: Any, feed_url: str) -> str | None:
             ):
                 return _absolutize(url, base)
 
-    # 4. <content:encoded> — the gap timmaurice/feedparser doesn't fill.
+    # 4. <content:encoded>, the gap timmaurice/feedparser doesn't fill.
     if content := entry.get("content"):
         for item in content:
             html = item.get("value") if isinstance(item, dict) else None

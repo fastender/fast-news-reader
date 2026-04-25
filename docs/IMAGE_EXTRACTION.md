@@ -1,6 +1,6 @@
-# Image Extraction — Why This Integration Exists
+# Image Extraction
 
-The single feature that justifies a third RSS integration alongside `core feedreader` and `timmaurice/feedparser`: **proper image extraction from `<content:encoded>`**.
+The single feature that justifies a third RSS integration alongside `core feedreader` and `timmaurice/feedparser`: proper image extraction from `<content:encoded>`.
 
 ## The problem
 
@@ -11,10 +11,10 @@ RSS has no standard image field. Five conventions evolved, all loosely supported
 | `media:thumbnail` | `<media:thumbnail url="...">` | BBC, Reuters |
 | `media:content` | `<media:content url="..." medium="image">` | Heise, AP |
 | `enclosure` | `<enclosure url="..." type="image/jpeg">` | Many podcasts, some news |
-| `<content:encoded>` | First `<img>` inside the CDATA HTML block | **Tagesschau, ZDF, Spiegel, many DE feeds** |
+| `<content:encoded>` | First `<img>` inside the CDATA HTML block | Tagesschau, ZDF, Spiegel, many DE feeds |
 | `<description>` HTML | First `<img>` inside the description text | Generic blogs, WordPress |
 
-`core feedreader` only forwards 4 keys to its event entity (`title`, `link`, `description`, `content`) — images deliberately stripped. `timmaurice/feedparser` checks paths 1, 2, 3, and 5 — but **not 4**. Tagesschau and most German news feeds put images **only** in `<content:encoded>`. Result: gray placeholders in the card.
+`core feedreader` only forwards 4 keys to its event entity (`title`, `link`, `description`, `content`); images are deliberately stripped. `timmaurice/feedparser` checks paths 1, 2, 3, and 5, but not 4. Tagesschau and most German news feeds put images only in `<content:encoded>`. Result: gray placeholders in the card.
 
 ## How this integration solves it
 
@@ -22,11 +22,11 @@ RSS has no standard image field. Five conventions evolved, all loosely supported
 
 ```
 extract_image(entry, feed_url):
-    1. media:thumbnail        → return first .url
-    2. media:content          → return first with medium=image or type=image/*
-    3. enclosures             → return first with type=image/*
-    4. <content:encoded>      → regex first <img src=...> inside HTML
-    5. <description>/summary  → regex first <img src=...> inside HTML
+    1. media:thumbnail        return first .url
+    2. media:content          return first with medium=image or type=image/*
+    3. enclosures             return first with type=image/*
+    4. <content:encoded>      regex first <img src=...> inside HTML
+    5. <description>/summary  regex first <img src=...> inside HTML
     return None
 ```
 
@@ -44,12 +44,12 @@ All returned URLs go through `urljoin()` against the feed URL so relative paths 
 
 ## Adding a sixth source
 
-If you find a feed that uses something exotic (e.g. `itunes:image`, custom namespace), add a new branch to `extract_image()` **before** the existing fallbacks. Keep the order:
+If you find a feed that uses something exotic (e.g. `itunes:image`, custom namespace), add a new branch to `extract_image()` before the existing fallbacks. Keep the order:
 
 1. Most-specific structured fields first (less likely to grab a tracking pixel)
 2. HTML scans last (more error-prone, may pick up irrelevant images)
 
-Always add a fixture and test before adding a path — the test file is the contract.
+Always add a fixture and test before adding a path; the test file is the contract.
 
 ## Phase 2: og:image fallback (planned, not yet implemented)
 

@@ -1,4 +1,4 @@
-"""Curated feed presets — the Feedly-style discovery experience.
+"""Curated feed presets for the discovery flow.
 
 Each preset has a stable `slug` (used as the dropdown value), a display
 `name`, the canonical `url`, a `category` for grouping, and a `language`
@@ -30,16 +30,16 @@ CATEGORY_SPORT = "sport"
 CATEGORY_BUSINESS = "business"
 
 CATEGORY_LABELS: dict[str, str] = {
-    CATEGORY_NEWS: "📰 News",
-    CATEGORY_TECH: "💻 Tech",
-    CATEGORY_SCIENCE: "🔬 Science",
-    CATEGORY_SPORT: "⚽ Sport",
-    CATEGORY_BUSINESS: "📈 Business",
+    CATEGORY_NEWS: "News",
+    CATEGORY_TECH: "Tech",
+    CATEGORY_SCIENCE: "Science",
+    CATEGORY_SPORT: "Sport",
+    CATEGORY_BUSINESS: "Business",
 }
 
 LANGUAGE_LABELS: dict[Language, str] = {
-    "de": "🇩🇪 Deutsch",
-    "en": "🇬🇧 English",
+    "de": "Deutsch",
+    "en": "English",
 }
 
 
@@ -54,7 +54,7 @@ def _p(slug: str, name: str, url: str, category: str, language: Language) -> Pre
 
 
 PRESETS: list[Preset] = [
-    # 🇩🇪 News
+    # German news
     _p("tagesschau", "Tagesschau",
        "https://www.tagesschau.de/xml/rss2/", CATEGORY_NEWS, "de"),
     _p("spiegel", "Spiegel Online",
@@ -69,7 +69,7 @@ PRESETS: list[Preset] = [
        "https://www.tagesspiegel.de/contentexport/feed/home", CATEGORY_NEWS, "de"),
     _p("dw_de", "Deutsche Welle",
        "https://rss.dw.com/rdf/rss-de-all", CATEGORY_NEWS, "de"),
-    # 🇬🇧 News
+    # English news
     _p("bbc", "BBC News",
        "https://feeds.bbci.co.uk/news/rss.xml", CATEGORY_NEWS, "en"),
     _p("guardian", "The Guardian",
@@ -94,7 +94,7 @@ PRESETS: list[Preset] = [
     # Science
     _p("nature", "Nature",
        "https://www.nature.com/nature.rss", CATEGORY_SCIENCE, "en"),
-    _p("sciencedaily", "ScienceDaily — Top",
+    _p("sciencedaily", "ScienceDaily Top",
        "https://www.sciencedaily.com/rss/top.xml", CATEGORY_SCIENCE, "en"),
     # Sport
     _p("kicker", "Kicker",
@@ -105,7 +105,7 @@ PRESETS: list[Preset] = [
     _p("handelsblatt", "Handelsblatt",
        "https://www.handelsblatt.com/contentexport/feed/top-themen",
        CATEGORY_BUSINESS, "de"),
-    _p("ft", "Financial Times — Home",
+    _p("ft", "Financial Times Home",
        "https://www.ft.com/rss/home", CATEGORY_BUSINESS, "en"),
 ]
 
@@ -140,7 +140,7 @@ def preset_options_for_language(
             options.append(
                 {
                     "value": preset["slug"],
-                    "label": f"{label}  ·  {preset['name']}",
+                    "label": f"{label}: {preset['name']}",
                 }
             )
     return options

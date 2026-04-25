@@ -12,7 +12,7 @@ from .conftest import load_fixture
 @pytest.mark.parametrize(
     ("fixture", "feed_url", "expected_substring"),
     [
-        # Path 4: <content:encoded> — the gap that motivated this component.
+        # Path 4: <content:encoded>, the gap that motivated this component.
         ("tagesschau.xml", "https://www.tagesschau.de/xml/rss2/", "tagesschau.de"),
         # Path 1: media:thumbnail
         ("bbc.xml", "https://feeds.bbci.co.uk/news/rss.xml", "bbci.co.uk"),

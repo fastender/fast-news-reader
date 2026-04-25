@@ -33,10 +33,10 @@ Each configured feed becomes one `sensor.<name>` entity. The schema is **drop-in
 
 | Key | Type | Notes |
 |---|---|---|
-| `id` | `str` | `entry.id` → `entry.guid` → `entry.link` (first non-empty) |
+| `id` | `str` | `entry.id` to `entry.guid` to `entry.link` (first non-empty) |
 | `title` | `str` | |
 | `link` | `str` | Article URL |
-| `summary` | `str` | May contain HTML — strip client-side if you need plain text |
+| `summary` | `str` | May contain HTML; strip client-side if you need plain text |
 | `content` | `str \| None` | Full HTML from `<content:encoded>` if present |
 | `published` | `str \| None` | Formatted per `date_format` config (default ISO 8601) |
 | `image` | `str \| None` | **Absolute** URL extracted via [5 paths](IMAGE_EXTRACTION.md) |
@@ -51,12 +51,12 @@ additional sensors are created so simple Lovelace cards can avoid templates:
 
 | Entity | Device class | Notes |
 |---|---|---|
-| `<feed>_latest_title` | — | First entry's title |
-| `<feed>_latest_link` | — | URL of the first entry (disabled by default) |
-| `<feed>_latest_image` | — | Image URL — also exposed as `entity_picture` |
+| `<feed>_latest_title` | (none) | First entry's title |
+| `<feed>_latest_link` | (none) | URL of the first entry (disabled by default) |
+| `<feed>_latest_image` | (none) | Image URL, also exposed as `entity_picture` |
 | `<feed>_latest_published` | `timestamp` | Real `datetime` for use with `relative_time()` |
 
-The main count sensor's `unique_id` is unchanged across upgrades — Lovelace
+The main count sensor's `unique_id` is unchanged across upgrades, so Lovelace
 cards built against v0.3.x keep working. Sub-sensors are additive.
 
 ## Example
@@ -85,4 +85,5 @@ sensor.tagesschau:
 
 ## Stability
 
-The schema follows semver against the integration version. Breaking changes only on major bumps (1.0 → 2.0). Adding optional fields is non-breaking.
+The schema follows semver against the integration version. Breaking changes only on major bumps (1.0 to 2.0). Adding optional fields is non-breaking.
+

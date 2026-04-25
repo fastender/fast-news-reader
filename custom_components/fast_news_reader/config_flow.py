@@ -46,7 +46,7 @@ def _is_valid_url(url: str) -> bool:
 
 
 async def _validate_feed(hass: Any, url: str) -> str | None:
-    """Live-fetch the URL — return error key or None on success."""
+    """Live-fetch the URL, return error key or None on success."""
     if not _is_valid_url(url):
         return "invalid_url"
     session = async_get_clientsession(hass)
@@ -81,7 +81,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Initial menu — pick discovery path."""
+        """Initial menu, pick discovery path."""
         return self.async_show_menu(
             step_id="user",
             menu_options=["preset_language", "custom"],
@@ -90,7 +90,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_preset_language(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Region picker — narrows the curated list to one language."""
+        """Region picker, narrows the curated list to one language."""
         if user_input is not None:
             self._language = user_input[CONF_LANGUAGE]
             self._scan_interval = user_input[CONF_SCAN_INTERVAL]
@@ -120,7 +120,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_preset_select(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Multi-select dropdown — already-configured feeds are filtered out."""
+        """Multi-select dropdown, already-configured feeds are filtered out."""
         assert self._language is not None
         errors: dict[str, str] = {}
         excluded_urls = self._existing_urls()
@@ -142,7 +142,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if not presets:
                     errors[CONF_PRESETS] = "unknown_preset"
                 else:
-                    # Schedule the rest as background imports — one ConfigEntry per feed.
+                    # Schedule the rest as background imports, one ConfigEntry per feed.
                     for preset in presets[1:]:
                         self.hass.async_create_task(
                             self.hass.config_entries.flow.async_init(
@@ -196,7 +196,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_import(
         self, user_input: dict[str, Any]
     ) -> FlowResult:
-        """Programmatic entry creation — used to add the 2nd…Nth preset in a multi-select."""
+        """Programmatic entry creation, used to add the 2nd…Nth preset in a multi-select."""
         url = user_input[CONF_FEED_URL]
         await self.async_set_unique_id(url)
         self._abort_if_unique_id_configured()
@@ -214,7 +214,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_custom(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Custom feed URL — for everything not in the preset list."""
+        """Custom feed URL, for everything not in the preset list."""
         errors: dict[str, str] = {}
 
         if user_input is not None:

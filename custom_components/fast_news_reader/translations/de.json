@@ -5,8 +5,8 @@
         "title": "News-Feed hinzufügen",
         "description": "Wie möchtest du deinen Feed hinzufügen?",
         "menu_options": {
-          "preset_language": "📰  Aus kuratierten Feeds wählen (empfohlen)",
-          "custom": "🔗  Eigene Feed-URL eingeben"
+          "preset_language": "Aus kuratierten Feeds wählen (empfohlen)",
+          "custom": "Eigene Feed-URL eingeben"
         }
       },
       "preset_language": {
@@ -19,7 +19,7 @@
       },
       "preset_select": {
         "title": "Feeds auswählen",
-        "description": "Wähle einen oder mehrere Feeds aus — jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir hier aus.\n\n{available} Feeds verfügbar für {language}.",
+        "description": "Wähle einen oder mehrere Feeds aus. Jeder wird als eigenes Gerät hinzugefügt. Bereits hinzugefügte Feeds blenden wir hier aus.\n\n{available} Feeds verfügbar für {language}.",
         "data": {
           "presets": "Feeds"
         }
@@ -31,7 +31,7 @@
           "name": "Anzeigename",
           "feed_url": "Feed-URL",
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)",
-          "date_format": "Datumsformat (fortgeschritten — strftime)",
+          "date_format": "Datumsformat (fortgeschritten, strftime)",
           "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
         }
       },
@@ -67,7 +67,7 @@
         "description": "Passe an, wie oft aktualisiert wird und wie Datumsangaben angezeigt werden.",
         "data": {
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)",
-          "date_format": "Datumsformat (fortgeschritten — strftime)",
+          "date_format": "Datumsformat (fortgeschritten, strftime)",
           "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
         }
       }

@@ -16,7 +16,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-The image-extractor tests need real RSS fixtures — see [`tests/fixtures/README.md`](../tests/fixtures/README.md) for capture instructions. Until those are committed, the parametrized tests fail with "fixture not found".
+The image-extractor tests need real RSS fixtures; see [`tests/fixtures/README.md`](../tests/fixtures/README.md) for capture instructions. Until those are committed, the parametrized tests fail with "fixture not found".
 
 ## Linting
 
@@ -34,7 +34,7 @@ custom_components/fast_news_reader/
 ├── __init__.py          # async_setup_entry, lifecycle
 ├── manifest.json        # HACS metadata
 ├── const.py             # DOMAIN, CONF_*, defaults
-├── config_flow.py       # UI setup (Settings → Devices & Services → Add)
+├── config_flow.py       # UI setup (Settings, Devices & Services, Add)
 ├── coordinator.py       # DataUpdateCoordinator: fetch + parse
 ├── sensor.py            # SensorEntity (1 per feed)
 ├── image_extractor.py   # 5-path image extraction (the core value)
@@ -48,15 +48,15 @@ custom_components/fast_news_reader/
 
 ```
 HA start
-  → __init__.async_setup_entry
-  → FastNewsReaderCoordinator.async_config_entry_first_refresh()
-       → fetch feed via aiohttp
-       → feedparser.parse() in executor (CPU-bound)
-       → extract_image() per entry
-  → forward_entry_setups(["sensor"])
-       → FastNewsReaderSensor created
-  → coordinator polls on scan_interval
-       → on update: sensor.async_write_ha_state()
+  -> __init__.async_setup_entry
+  -> FastNewsReaderCoordinator.async_config_entry_first_refresh()
+       -> fetch feed via aiohttp
+       -> feedparser.parse() in executor (CPU-bound)
+       -> extract_image() per entry
+  -> forward_entry_setups(["sensor"])
+       -> FastNewsReaderSensor created
+  -> coordinator polls on scan_interval
+       -> on update: sensor.async_write_ha_state()
 ```
 
 ## Local HA test instance
@@ -69,7 +69,7 @@ The fastest way to smoke-test changes against a real feed:
    ln -s $(pwd)/custom_components/fast_news_reader ./config/custom_components/fast_news_reader
    ```
 3. Restart the dev HA, add the integration via the UI, point it at `https://www.tagesschau.de/xml/rss2/`
-4. Open Developer Tools → States → search `sensor.tagesschau`. Each entry should have a non-null `image` URL.
+4. Open Developer Tools, States, search `sensor.tagesschau`. Each entry should have a non-null `image` URL.
 
 ## Releasing
 
@@ -80,4 +80,4 @@ The fastest way to smoke-test changes against a real feed:
 
 ## Adding a new image source
 
-See [IMAGE_EXTRACTION.md → Adding a sixth source](IMAGE_EXTRACTION.md#adding-a-sixth-source). Always add a fixture + test first.
+See [IMAGE_EXTRACTION.md, "Adding a sixth source"](IMAGE_EXTRACTION.md#adding-a-sixth-source). Always add a fixture + test first.

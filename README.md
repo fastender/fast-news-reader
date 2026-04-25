@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <em>RSS for Home Assistant — with the images you actually want.</em>
+  <em>RSS for Home Assistant, with the images you actually want.</em>
 </p>
 
 [![GitHub Release](https://img.shields.io/github/v/release/fastender/fast-news-reader?style=flat-square)](https://github.com/fastender/fast-news-reader/releases)
@@ -12,38 +12,38 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12+-03A9F4?style=flat-square&logo=home-assistant&logoColor=white)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-Add any RSS or Atom feed to Home Assistant in seconds — with **proper image extraction**, including from `<content:encoded>`, the source most other integrations skip. Pick from 20+ hand-picked feeds (Tagesschau, Heise, BBC, The Verge…) or paste your own URL.
-
----
+Add any RSS or Atom feed to Home Assistant in seconds, with proper image extraction including from `<content:encoded>`, the source most other integrations skip. Pick from 20+ hand-picked feeds (Tagesschau, Heise, BBC, The Verge, ...) or paste your own URL.
 
 ## Why this exists
 
 - `core feedreader` strips images from event entities by design.
-- `timmaurice/feedparser` checks `media:*` and enclosures, but **not** `<content:encoded>`. Tagesschau, Heise, Spiegel and many German feeds put their images only there → no images in your card.
+- `timmaurice/feedparser` checks `media:*` and enclosures, but not `<content:encoded>`. Tagesschau, Heise, Spiegel and many German feeds put their images only there, so news cards show gray placeholders.
 
-This integration covers all five common image sources, so your news card actually has pictures in it.
+This integration covers all five common image sources, so news cards actually have pictures in them.
 
-## ✨ What you get
+## Features
 
-- 📰 **Feedly-style discovery** — pick from a curated dropdown filtered by region (DE / EN), or paste a custom URL
-- 🖼️ **Images that actually show up** — five-path extractor, including the `<content:encoded>` gap
-- 🎴 **Lovelace card included** — `custom:fast-news-reader-card` ships with the integration, no separate install
-- 🧩 **One Device per feed** — main count sensor + `latest_title` / `latest_image` / `latest_published` sub-sensors, ready for templates and dashboards
-- ⚙️ **Edit anytime** — reconfigure the URL, rename the feed, change refresh interval — without re-adding
-- 🌐 **Drop-in compatible** — same sensor schema as `timmaurice/feedparser`, existing Lovelace cards keep working
-- 🇩🇪 **DE + EN translations** — friendly, conversational UI copy
+- Curated dropdown of 20+ feeds, filtered by region (DE / EN), or paste a custom URL.
+- Five-path image extractor including `<content:encoded>`.
+- Lovelace card included (`custom:fast-news-reader-card`), no separate install.
+- One Device per feed: main count sensor plus `latest_title`, `latest_image`, `latest_published` sub-sensors.
+- Edit anytime: change the feed URL, rename, or adjust the refresh interval without removing the entry.
+- Drop-in compatible with the `timmaurice/feedparser` schema; existing Lovelace cards keep working.
+- DE + EN translations.
 
-## 🚀 Install (HACS Custom Repository)
+## Install
 
-1. HACS → Integrations → ⋮ → **Custom repositories**
-2. Add `https://github.com/fastender/fast-news-reader` as **Integration**
-3. Install, restart Home Assistant
-4. **Settings → Devices & Services → Add Integration → "Fast News Reader"**
-5. Pick a feed from the list — done.
+Via HACS as a custom repository:
 
-## 🎴 Lovelace card
+1. HACS, Integrations, three-dot menu, **Custom repositories**.
+2. Add `https://github.com/fastender/fast-news-reader` as **Integration**.
+3. Install, restart Home Assistant.
+4. Settings, Devices & Services, Add Integration, "Fast News Reader".
+5. Pick a region, then one or more feeds.
 
-A custom card ships inside the integration and registers itself automatically — no manual resource step. Add it to any dashboard:
+## Lovelace card
+
+The card ships with the integration and registers itself automatically. Add it to any dashboard:
 
 ```yaml
 type: custom:fast-news-reader-card
@@ -55,9 +55,9 @@ show_date: true         # default true (relative timestamp)
 title: "Tagesschau"     # optional, defaults to the channel title
 ```
 
-The card renders a Feedly-style stack of articles with image, title, summary, and a relative timestamp (`2 hours ago`). Clicking an article opens the source URL in a new tab. Theme-aware via HA CSS variables — looks at home in light and dark modes.
+The card shows a stack of articles with image, title, summary, and a relative timestamp. Clicking opens the source URL in a new tab. Theme-aware via HA CSS variables.
 
-## 📊 Sensor schema
+## Sensor schema
 
 ```yaml
 sensor.<feed_name>:
@@ -74,27 +74,27 @@ sensor.<feed_name>:
 
 Full reference: [docs/SCHEMA.md](docs/SCHEMA.md).
 
-## 🛠️ Custom feeds
+## Custom feeds
 
-Don't see your favourite source in the list? Pick **🔗 Enter a custom feed URL** in the same dialog — works with any RSS or Atom feed.
+Don't see your source in the list? Pick "Enter a custom feed URL" instead. Works with any RSS or Atom feed.
 
 | Field | Default | Notes |
 |---|---|---|
-| `name` | — | Display name |
-| `feed_url` | — | RSS or Atom URL |
+| `name` | - | Display name |
+| `feed_url` | - | RSS or Atom URL |
 | `scan_interval` | `3600` | Seconds between fetches (min 60) |
 | `date_format` | `%Y-%m-%dT%H:%M:%S%z` | strftime for `entry.published` |
-| `local_time` | `false` | Convert UTC → local before formatting |
+| `local_time` | `false` | Convert UTC to local before formatting |
 
-## 📚 More docs
+## More docs
 
-- [Schema reference](docs/SCHEMA.md) — sensor attribute contract for card developers
-- [Image extraction deep-dive](docs/IMAGE_EXTRACTION.md) — why this integration exists, how the 5 paths work
-- [Development guide](docs/DEVELOPMENT.md) — local setup, testing, releasing
+- [Schema reference](docs/SCHEMA.md): sensor attribute contract for card developers.
+- [Image extraction deep-dive](docs/IMAGE_EXTRACTION.md): how the 5 paths work.
+- [Development guide](docs/DEVELOPMENT.md): local setup, testing, releasing.
 
-## 🤝 Contributing
+## Contributing
 
-PRs welcome — especially new entries for [`presets.py`](custom_components/fast_news_reader/presets.py). Add a fixture and a test before adding a new image extraction path; the test file is the contract.
+PRs welcome. Adding a curated feed is a one-liner in [`presets.py`](custom_components/fast_news_reader/presets.py). For new image extraction paths, add a fixture and a test first; the test file is the contract.
 
 ```bash
 pip install -e ".[dev]"
@@ -103,4 +103,4 @@ pytest
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

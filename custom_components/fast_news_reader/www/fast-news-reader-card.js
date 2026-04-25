@@ -1,5 +1,5 @@
 /*!
- * Fast News Reader — Lovelace card
+ * Fast News Reader, Lovelace card
  *
  * Vanilla web component (no Lit, no build step). Reads `entries` from a
  * fast_news_reader sensor and renders a Feedly-style stack of articles

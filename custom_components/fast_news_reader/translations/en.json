@@ -5,8 +5,8 @@
         "title": "Add a news feed",
         "description": "How would you like to add your feed?",
         "menu_options": {
-          "preset_language": "📰  Pick from curated feeds (recommended)",
-          "custom": "🔗  Enter a custom feed URL"
+          "preset_language": "Pick from curated feeds (recommended)",
+          "custom": "Enter a custom feed URL"
         }
       },
       "preset_language": {
@@ -19,7 +19,7 @@
       },
       "preset_select": {
         "title": "Pick your feeds",
-        "description": "Select one or more feeds — we'll add each one as its own device. Feeds you've already added are hidden from this list.\n\n{available} feeds available in {language}.",
+        "description": "Select one or more feeds. Each one is added as its own device. Feeds you've already added are hidden from this list.\n\n{available} feeds available in {language}.",
         "data": {
           "presets": "Feeds"
         }
@@ -31,7 +31,7 @@
           "name": "Display name",
           "feed_url": "Feed URL",
           "scan_interval": "How often should we check for updates? (seconds)",
-          "date_format": "Date format (advanced — strftime)",
+          "date_format": "Date format (advanced, strftime)",
           "local_time": "Show dates in your local timezone"
         }
       },
@@ -67,7 +67,7 @@
         "description": "Tweak how often we refresh and how dates are formatted.",
         "data": {
           "scan_interval": "How often should we check for updates? (seconds)",
-          "date_format": "Date format (advanced — strftime)",
+          "date_format": "Date format (advanced, strftime)",
           "local_time": "Show dates in your local timezone"
         }
       }
