@@ -2,40 +2,59 @@
   "config": {
     "step": {
       "user": {
-        "title": "RSS-Feed hinzufügen",
-        "description": "Konfiguriere eine neue RSS-Feed-Quelle.",
+        "title": "News-Feed hinzufügen",
+        "description": "Wie möchtest du deinen Feed hinzufügen?",
+        "menu_options": {
+          "preset": "📰  Aus kuratierten Feeds wählen (empfohlen)",
+          "custom": "🔗  Eigene Feed-URL eingeben"
+        }
+      },
+      "preset": {
+        "title": "Feed auswählen",
+        "description": "Handverlesene Feeds, die mit dieser Integration besonders gut funktionieren. Wähle einen aus — wir prüfen kurz, ob er erreichbar ist.",
         "data": {
-          "name": "Name",
+          "preset": "Feed",
+          "name": "Anzeigename (optional — leer lassen, um den Feed-Namen zu übernehmen)",
+          "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)"
+        }
+      },
+      "custom": {
+        "title": "Eigene Feed-URL",
+        "description": "Füge eine beliebige RSS- oder Atom-URL ein. Wir testen kurz, ob sie erreichbar ist, bevor wir speichern.",
+        "data": {
+          "name": "Anzeigename",
           "feed_url": "Feed-URL",
-          "scan_interval": "Aktualisierungsintervall (Sekunden)",
-          "date_format": "Datumsformat (strftime)",
-          "local_time": "Datum in lokale Zeitzone umwandeln"
+          "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)",
+          "date_format": "Datumsformat (fortgeschritten — strftime)",
+          "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
         }
       }
     },
     "error": {
-      "invalid_url": "Die URL muss mit http:// oder https:// beginnen.",
-      "fetch_failed": "Die Feed-URL konnte nicht erreicht werden.",
-      "timeout": "Zeitüberschreitung beim Abrufen der Feed-URL.",
-      "interval_too_short": "Das Aktualisierungsintervall muss mindestens 60 Sekunden betragen."
+      "invalid_url": "Das sieht nicht nach einer gültigen http(s)-URL aus.",
+      "fetch_failed": "Wir konnten den Feed nicht erreichen. Prüfe die URL und versuche es noch mal.",
+      "timeout": "Der Feed hat zu lange gebraucht. Probier's später erneut oder prüfe die URL.",
+      "interval_too_short": "Bitte setze das Intervall auf mindestens 60 Sekunden.",
+      "unknown_preset": "Dieser Vorschlag ist nicht mehr verfügbar. Wähle einen anderen."
     },
     "abort": {
-      "already_configured": "Diese Feed-URL ist bereits konfiguriert."
+      "already_configured": "Diesen Feed hast du bereits hinzugefügt."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Feed-Optionen bearbeiten",
+        "title": "Feed-Einstellungen",
+        "description": "Passe an, wie oft aktualisiert wird und wie Datumsangaben angezeigt werden.",
         "data": {
-          "scan_interval": "Aktualisierungsintervall (Sekunden)",
-          "date_format": "Datumsformat (strftime)",
-          "local_time": "Datum in lokale Zeitzone umwandeln"
+          "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)",
+          "date_format": "Datumsformat (fortgeschritten — strftime)",
+          "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
         }
       }
     },
     "error": {
-      "interval_too_short": "Das Aktualisierungsintervall muss mindestens 60 Sekunden betragen."
+      "interval_too_short": "Bitte setze das Intervall auf mindestens 60 Sekunden."
     }
   }
 }

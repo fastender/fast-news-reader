@@ -2,40 +2,59 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add RSS feed",
-        "description": "Configure a new RSS feed source.",
+        "title": "Add a news feed",
+        "description": "How would you like to add your feed?",
+        "menu_options": {
+          "preset": "📰  Pick from curated feeds (recommended)",
+          "custom": "🔗  Enter a custom feed URL"
+        }
+      },
+      "preset": {
+        "title": "Choose a feed",
+        "description": "Hand-picked feeds that work well with this integration. Pick one — we'll fetch a sample to make sure it's reachable.",
         "data": {
-          "name": "Name",
+          "preset": "Feed",
+          "name": "Display name (optional — leave blank to use the feed's own name)",
+          "scan_interval": "How often should we check for updates? (seconds)"
+        }
+      },
+      "custom": {
+        "title": "Custom feed URL",
+        "description": "Paste any RSS or Atom feed URL. We'll verify it's reachable before saving.",
+        "data": {
+          "name": "Display name",
           "feed_url": "Feed URL",
-          "scan_interval": "Scan interval (seconds)",
-          "date_format": "Date format (strftime)",
-          "local_time": "Convert dates to local time"
+          "scan_interval": "How often should we check for updates? (seconds)",
+          "date_format": "Date format (advanced — strftime)",
+          "local_time": "Show dates in your local timezone"
         }
       }
     },
     "error": {
-      "invalid_url": "URL must start with http:// or https://.",
-      "fetch_failed": "Could not reach the feed URL.",
-      "timeout": "The feed URL timed out.",
-      "interval_too_short": "Scan interval must be at least 60 seconds."
+      "invalid_url": "That doesn't look like a valid http(s) URL.",
+      "fetch_failed": "We couldn't reach that feed. Check the URL and try again.",
+      "timeout": "The feed took too long to respond. Try again later or check the URL.",
+      "interval_too_short": "Please set the interval to at least 60 seconds.",
+      "unknown_preset": "That preset is no longer available. Pick another one."
     },
     "abort": {
-      "already_configured": "This feed URL is already configured."
+      "already_configured": "You've already added this feed."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Edit feed options",
+        "title": "Feed settings",
+        "description": "Tweak how often we refresh and how dates are formatted.",
         "data": {
-          "scan_interval": "Scan interval (seconds)",
-          "date_format": "Date format (strftime)",
-          "local_time": "Convert dates to local time"
+          "scan_interval": "How often should we check for updates? (seconds)",
+          "date_format": "Date format (advanced — strftime)",
+          "local_time": "Show dates in your local timezone"
         }
       }
     },
     "error": {
-      "interval_too_short": "Scan interval must be at least 60 seconds."
+      "interval_too_short": "Please set the interval to at least 60 seconds."
     }
   }
 }

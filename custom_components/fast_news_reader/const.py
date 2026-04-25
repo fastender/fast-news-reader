@@ -10,6 +10,7 @@ CONF_FEED_URL = "feed_url"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_DATE_FORMAT = "date_format"
 CONF_LOCAL_TIME = "local_time"
+CONF_PRESET = "preset"
 
 DEFAULT_SCAN_INTERVAL = timedelta(hours=1)
 DEFAULT_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S%z"

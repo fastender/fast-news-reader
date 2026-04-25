@@ -11,12 +11,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     CONF_DATE_FORMAT,
     CONF_FEED_URL,
     CONF_LOCAL_TIME,
     CONF_NAME,
+    CONF_PRESET,
     CONF_SCAN_INTERVAL,
     DEFAULT_DATE_FORMAT,
     DEFAULT_LOCAL_TIME,
@@ -25,6 +31,7 @@ from .const import (
     FETCH_TIMEOUT,
     MIN_SCAN_INTERVAL,
 )
+from .presets import get_preset, preset_options
 
 
 def _is_valid_url(url: str) -> bool:
@@ -33,7 +40,7 @@ def _is_valid_url(url: str) -> bool:
 
 
 async def _validate_feed(hass: Any, url: str) -> str | None:
-    """HEAD/GET the URL — return error key or None on success."""
+    """Live-fetch the URL — return error key or None on success."""
     if not _is_valid_url(url):
         return "invalid_url"
     session = async_get_clientsession(hass)
@@ -50,14 +57,86 @@ async def _validate_feed(hass: Any, url: str) -> str | None:
 
 
 class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Fast News Reader."""
+    """Two-step flow: pick a curated preset, or enter a custom URL."""
 
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
+        """Initial menu — pick discovery path."""
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["preset", "custom"],
+        )
+
+    async def async_step_preset(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Curated dropdown of well-known feeds."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            scan_interval = user_input[CONF_SCAN_INTERVAL]
+            if scan_interval < MIN_SCAN_INTERVAL:
+                errors[CONF_SCAN_INTERVAL] = "interval_too_short"
+
+            preset = get_preset(user_input[CONF_PRESET])
+            if not preset:
+                errors[CONF_PRESET] = "unknown_preset"
+
+            if not errors and preset:
+                await self.async_set_unique_id(preset["url"])
+                self._abort_if_unique_id_configured()
+                if err := await _validate_feed(self.hass, preset["url"]):
+                    errors[CONF_PRESET] = err
+                else:
+                    name = (user_input.get(CONF_NAME) or preset["name"]).strip()
+                    return self.async_create_entry(
+                        title=name,
+                        data={
+                            CONF_NAME: name,
+                            CONF_FEED_URL: preset["url"],
+                            CONF_SCAN_INTERVAL: scan_interval,
+                            CONF_DATE_FORMAT: DEFAULT_DATE_FORMAT,
+                            CONF_LOCAL_TIME: DEFAULT_LOCAL_TIME,
+                        },
+                    )
+
+        defaults = user_input or {}
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_PRESET,
+                    default=defaults.get(CONF_PRESET),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=preset_options(),
+                        mode=SelectSelectorMode.DROPDOWN,
+                        sort=False,
+                    )
+                ),
+                vol.Optional(
+                    CONF_NAME,
+                    default=defaults.get(CONF_NAME, ""),
+                ): str,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=defaults.get(
+                        CONF_SCAN_INTERVAL,
+                        int(DEFAULT_SCAN_INTERVAL.total_seconds()),
+                    ),
+                ): int,
+            }
+        )
+        return self.async_show_form(
+            step_id="preset", data_schema=schema, errors=errors
+        )
+
+    async def async_step_custom(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Custom feed URL — for everything not in the preset list."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -77,15 +156,16 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         title=user_input[CONF_NAME], data=user_input
                     )
 
+        defaults = user_input or {}
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_NAME,
-                    default=(user_input or {}).get(CONF_NAME, ""),
+                    default=defaults.get(CONF_NAME, ""),
                 ): str,
                 vol.Required(
                     CONF_FEED_URL,
-                    default=(user_input or {}).get(CONF_FEED_URL, ""),
+                    default=defaults.get(CONF_FEED_URL, ""),
                 ): str,
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
@@ -95,7 +175,9 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_LOCAL_TIME, default=DEFAULT_LOCAL_TIME): bool,
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="custom", data_schema=schema, errors=errors
+        )
 
     @staticmethod
     @callback
@@ -106,7 +188,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class FastNewsReaderOptionsFlow(config_entries.OptionsFlow):
-    """Allow editing scan_interval, date_format, local_time without re-adding."""
+    """Edit scan_interval, date_format, local_time without re-adding."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         self.config_entry = config_entry

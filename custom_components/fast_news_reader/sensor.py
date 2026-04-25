@@ -27,6 +27,7 @@ class FastNewsReaderSensor(CoordinatorEntity[FastNewsReaderCoordinator], SensorE
     """Single sensor entity exposing parsed feed data."""
 
     _attr_has_entity_name = False
+    _attr_icon = "mdi:rss"
 
     def __init__(
         self,
