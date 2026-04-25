@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiohttp
 import feedparser
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -119,7 +118,7 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ts = entry.get("published_parsed") or entry.get("updated_parsed")
         if not ts:
             return entry.get("published") or entry.get("updated")
-        dt = datetime(*ts[:6], tzinfo=timezone.utc)
+        dt = datetime(*ts[:6], tzinfo=UTC)
         if self.local_time:
             dt = dt.astimezone()
         return dt.strftime(self.date_format)

@@ -1,6 +1,6 @@
 {
   "name": "Fast News Reader",
   "render_readme": true,
-  "country": ["DE", "EN"],
+  "country": ["DE"],
   "homeassistant": "2024.12.0"
 }

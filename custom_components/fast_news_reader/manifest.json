@@ -1,12 +1,12 @@
 {
   "domain": "fast_news_reader",
   "name": "Fast News Reader",
-  "version": "0.2.0",
-  "documentation": "https://github.com/fastender/fast-news-reader",
-  "issue_tracker": "https://github.com/fastender/fast-news-reader/issues",
+  "codeowners": ["@fastender"],
   "config_flow": true,
-  "iot_class": "cloud_polling",
-  "requirements": ["feedparser>=6.0.10"],
   "dependencies": [],
-  "codeowners": ["@fastender"]
+  "documentation": "https://github.com/fastender/fast-news-reader",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/fastender/fast-news-reader/issues",
+  "requirements": ["feedparser>=6.0.10"],
+  "version": "0.2.0"
 }
