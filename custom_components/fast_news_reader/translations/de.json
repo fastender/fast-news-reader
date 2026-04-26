@@ -58,6 +58,7 @@
       "invalid_url": "Das sieht nicht nach einer gültigen http(s)-URL aus.",
       "fetch_failed": "Wir konnten den Feed nicht erreichen. Prüfe die URL und versuche es noch mal.",
       "timeout": "Der Feed hat zu lange gebraucht. Probier's später erneut oder prüfe die URL.",
+      "not_a_feed": "Die URL antwortet, sieht aber nicht nach einem RSS- oder Atom-Feed aus. Stelle sicher, dass du die Feed-URL kopiert hast, nicht die Startseite.",
       "interval_too_short": "Bitte setze das Intervall auf mindestens 60 Sekunden.",
       "unknown_preset": "Dieser Vorschlag ist nicht mehr verfügbar. Wähle einen anderen.",
       "no_selection": "Wähle mindestens einen Feed aus."

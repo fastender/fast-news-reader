@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.8.7";
+const CARD_VERSION = "0.8.8";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -598,6 +598,15 @@ if (!customElements.get("fast-news-reader-card-editor")) {
 
 const MODAL_STYLES = `
   :host { all: initial; }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .overlay {
     position: fixed; inset: 0;
     background: rgba(0, 0, 0, 0.78);
@@ -807,6 +816,7 @@ class FastNewsReaderModal extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${MODAL_STYLES}</style>
       <div class="overlay" part="overlay">
+        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
         <button class="nav prev" aria-label="Previous">‹</button>
         <article class="panel" tabindex="-1">
           <div class="actions">
@@ -844,6 +854,7 @@ class FastNewsReaderModal extends HTMLElement {
       save: r.querySelector(".action-btn.save"),
       fav: r.querySelector(".action-btn.fav"),
       hide: r.querySelector(".action-btn.hide"),
+      live: r.querySelector(".sr-only"),
     };
 
     this._refs.close.addEventListener("click", () => this.close());
@@ -924,6 +935,10 @@ class FastNewsReaderModal extends HTMLElement {
     r.prev.disabled = this._index <= 0;
     r.next.disabled = this._index >= this._entries.length - 1;
 
+    if (r.live) {
+      r.live.textContent = `Article ${this._index + 1} of ${this._entries.length}: ${e.title || ""}`;
+    }
+
     this._refreshActionStates();
   }
 
@@ -968,6 +983,19 @@ const CARD_STYLES = `
     font-size: 0.9rem;
     text-align: center;
   }
+  .feed-warning {
+    margin: 0 16px 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--warning-color, #f4a261);
+    color: var(--text-primary-color, #1a1a1a);
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .feed-warning .warn-icon { font-size: 1rem; line-height: 1; }
   .list { display: flex; flex-direction: column; }
   .article {
     display: grid;
@@ -1133,6 +1161,7 @@ class FastNewsReaderCard extends HTMLElement {
       const id = feed.entity;
       const stateObj = this._hass.states[id];
       if (!stateObj) continue;
+      if (stateObj.state === "unavailable" || stateObj.state === "unknown") continue;
       const channel = stateObj.attributes.channel || {};
       const sourceTitle = channel.title || stateObj.attributes.friendly_name || id;
       byEntity[id] = sourceTitle;
@@ -1189,11 +1218,30 @@ class FastNewsReaderCard extends HTMLElement {
     const favorites = ArticleStore.load("favorite");
     const saved = ArticleStore.load("saved");
 
+    const unavailableNames = this._config.entities
+      .map((f) => {
+        const s = hass.states[f.entity];
+        if (s && s.state !== "unavailable" && s.state !== "unknown") return null;
+        return s?.attributes?.friendly_name || f.entity;
+      })
+      .filter(Boolean);
+    const warningHtml = unavailableNames.length
+      ? `<div class="feed-warning" role="status">
+          <span class="warn-icon" aria-hidden="true">⚠</span>
+          <span>${
+            unavailableNames.length === 1
+              ? `${escapeHtml(unavailableNames[0])} is unavailable`
+              : `${unavailableNames.length} feeds unavailable`
+          }</span>
+        </div>`
+      : "";
+
     const safeHeader = escapeHtml(headerTitle);
 
     if (!visible.length) {
       this._renderShell(`
         <div class="header"><span>${safeHeader}</span></div>
+        ${warningHtml}
         <div class="empty">No entries.</div>
       `);
       return;
@@ -1248,6 +1296,7 @@ class FastNewsReaderCard extends HTMLElement {
         <span>${safeHeader}</span>
         <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
       </div>
+      ${warningHtml}
       <div class="list">${itemsHtml}</div>
     `);
 

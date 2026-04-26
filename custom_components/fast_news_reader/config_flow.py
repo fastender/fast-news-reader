@@ -55,8 +55,25 @@ def _is_valid_url(url: str) -> bool:
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
+_FEED_BODY_MARKERS = ("<?xml", "<rss", "<feed", "<rdf:rdf")
+
+
+def _looks_like_feed(sample: bytes) -> bool:
+    """True if the first bytes of a response look like RSS, Atom, or RDF."""
+    head = sample[:1024].decode("utf-8", errors="ignore").lstrip().lower()
+    if not head:
+        return False
+    if head.startswith("<?xml"):
+        return True
+    return any(marker in head for marker in _FEED_BODY_MARKERS)
+
+
 async def _validate_feed(hass: Any, url: str) -> str | None:
-    """Live-fetch the URL, return error key or None on success."""
+    """Live-fetch the URL, return error key or None on success.
+
+    Reads the first KB of the response body so we can fail fast when a
+    user pastes the homepage URL instead of the feed URL.
+    """
     if not _is_valid_url(url):
         return "invalid_url"
     session = async_get_clientsession(hass)
@@ -65,10 +82,13 @@ async def _validate_feed(hass: Any, url: str) -> str | None:
         async with session.get(url, timeout=timeout) as resp:
             if resp.status >= 400:
                 return "fetch_failed"
+            sample = await resp.content.read(1024)
     except aiohttp.ClientError:
         return "fetch_failed"
     except TimeoutError:
         return "timeout"
+    if not _looks_like_feed(sample):
+        return "not_a_feed"
     return None
 
 

@@ -58,6 +58,7 @@
       "invalid_url": "That doesn't look like a valid http(s) URL.",
       "fetch_failed": "We couldn't reach that feed. Check the URL and try again.",
       "timeout": "The feed took too long to respond. Try again later or check the URL.",
+      "not_a_feed": "That URL responded, but it doesn't look like an RSS or Atom feed. Make sure you copied the feed URL, not the homepage.",
       "interval_too_short": "Please set the interval to at least 60 seconds.",
       "unknown_preset": "That preset is no longer available. Pick another one.",
       "no_selection": "Pick at least one feed to continue."

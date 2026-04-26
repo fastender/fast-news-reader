@@ -8,6 +8,27 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.8] - 2026-04-26
+
+### Added
+
+- **Custom-feed setup now sniffs the response body.** Pasting a homepage URL
+  instead of an actual feed URL used to pass setup validation (HTTP 200) and
+  fail later in the coordinator. The validator now reads the first kilobyte
+  of the response and looks for an XML, RSS, Atom, or RDF root marker. If it
+  cannot find one, setup fails with the new `not_a_feed` error explaining
+  the likely fix. Adds the matching string in English and German.
+- **Card warns when a feed sensor is unavailable.** A small banner appears
+  in the card header listing which configured feed (or how many of them) is
+  currently `unavailable` or `unknown`, so a multi-feed card still showing
+  three of four sources doesn't quietly hide the dead one. The unavailable
+  sensor is also skipped during aggregation so its (potentially stale)
+  cached attributes never leak in.
+- **Reader modal announces position to screen readers.** A hidden
+  `aria-live="polite"` region inside the modal now reads out
+  "Article 3 of 12: <title>" whenever the user navigates with prev/next or
+  swipes. Sighted users see no change.
+
 ## [0.8.7] - 2026-04-26
 
 ### Fixed
@@ -99,6 +120,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.8.8]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.8
 [0.8.7]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.7
 [0.8.6]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.6
 [0.8.5]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.5
