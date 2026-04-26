@@ -67,6 +67,32 @@ def test_derive_favicon_returns_none_for_garbage() -> None:
     assert _derive_favicon("ftp://example.com/x") is None
 
 
+# ---- Theme resolution ----------------------------------------------------
+
+
+def test_theme_used_from_entry_data(hass) -> None:
+    """If the entry already stored CONF_THEME (preset setup did this), use
+    it directly without consulting the URL lookup."""
+    coord = FastNewsReaderCoordinator(hass, _make_entry(theme="tech"))
+    assert coord.theme == "tech"
+    assert coord.theme_label == "Tech"
+
+
+def test_theme_reverse_derived_from_feed_url(hass) -> None:
+    """Existing entries that pre-date CONF_THEME should still resolve a
+    theme by matching their stored URL against the preset list."""
+    entry = _make_entry(feed_url="https://www.heise.de/rss/heise-atom.xml")
+    coord = FastNewsReaderCoordinator(hass, entry)
+    assert coord.theme == "tech"
+    assert coord.theme_label == "Tech"
+
+
+def test_theme_none_for_unknown_url(hass) -> None:
+    coord = FastNewsReaderCoordinator(hass, _make_entry())
+    assert coord.theme is None
+    assert coord.theme_label is None
+
+
 # ---- Date helpers --------------------------------------------------------
 
 

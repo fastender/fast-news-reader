@@ -33,6 +33,7 @@ from .const import (
     CONF_NAME,
     CONF_PRESETS,
     CONF_SCAN_INTERVAL,
+    CONF_THEME,
     DEFAULT_DATE_FORMAT,
     DEFAULT_LOCAL_TIME,
     DEFAULT_SCAN_INTERVAL,
@@ -247,6 +248,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     CONF_FEED_URL: preset["url"],
                                     CONF_SCAN_INTERVAL: self._scan_interval,
                                     CONF_AREA: self._area_id,
+                                    CONF_THEME: preset["category"],
                                 },
                             )
                         )
@@ -304,6 +306,7 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_DATE_FORMAT: DEFAULT_DATE_FORMAT,
                 CONF_LOCAL_TIME: DEFAULT_LOCAL_TIME,
                 CONF_AREA: user_input.get(CONF_AREA),
+                CONF_THEME: user_input.get(CONF_THEME),
             },
         )
 

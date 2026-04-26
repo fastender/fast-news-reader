@@ -111,10 +111,17 @@ PRESETS: list[Preset] = [
 
 
 _PRESET_BY_SLUG: dict[str, Preset] = {p["slug"]: p for p in PRESETS}
+_PRESET_BY_URL: dict[str, Preset] = {p["url"]: p for p in PRESETS}
 
 
 def get_preset(slug: str) -> Preset | None:
     return _PRESET_BY_SLUG.get(slug)
+
+
+def get_preset_by_url(url: str) -> Preset | None:
+    """Reverse lookup so existing config entries that pre-date the
+    `theme` field can still derive one from their stored feed URL."""
+    return _PRESET_BY_URL.get(url)
 
 
 def available_categories_for_language(

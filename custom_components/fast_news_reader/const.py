@@ -16,6 +16,7 @@ CONF_LANGUAGE = "language"
 CONF_CATEGORY = "category"
 CONF_AREA = "area_id"
 CONF_GO_BACK = "go_back"
+CONF_THEME = "theme"
 CATEGORY_ALL = "all"
 CATEGORY_BACK = "__back__"
 

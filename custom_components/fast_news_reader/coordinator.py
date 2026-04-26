@@ -19,6 +19,7 @@ from .const import (
     CONF_LOCAL_TIME,
     CONF_NAME,
     CONF_SCAN_INTERVAL,
+    CONF_THEME,
     DEFAULT_DATE_FORMAT,
     DEFAULT_LOCAL_TIME,
     DEFAULT_SCAN_INTERVAL,
@@ -26,6 +27,7 @@ from .const import (
     FETCH_TIMEOUT,
 )
 from .image_extractor import extract_image
+from .presets import CATEGORY_LABELS, get_preset_by_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +56,20 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.feed_name: str = merged[CONF_NAME]
         self.date_format: str = merged.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
         self.local_time: bool = merged.get(CONF_LOCAL_TIME, DEFAULT_LOCAL_TIME)
+
+        # Theme is the curated category from the preset (eg. "tech" for
+        # Heise). Entries added through the preset flow store it directly;
+        # older entries that pre-date the field reverse-derive from the URL
+        # so the user does not have to re-add their feeds.
+        theme: str | None = merged.get(CONF_THEME)
+        if not theme:
+            preset = get_preset_by_url(self.feed_url)
+            if preset:
+                theme = preset["category"]
+        self.theme: str | None = theme
+        self.theme_label: str | None = (
+            CATEGORY_LABELS.get(theme) if theme else None
+        )
 
         scan_interval_seconds = merged.get(
             CONF_SCAN_INTERVAL, int(DEFAULT_SCAN_INTERVAL.total_seconds())
@@ -100,6 +116,8 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "image": image_url,
             "icon": _derive_favicon(link, self.feed_url),
             "language": feed.get("language"),
+            "theme": self.theme,
+            "theme_label": self.theme_label,
         }
 
     def _safe_build_entry(self, entry: Any) -> dict[str, Any] | None:

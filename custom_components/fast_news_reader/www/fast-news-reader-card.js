@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.12.0";
+const CARD_VERSION = "0.13.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -445,8 +445,9 @@ class FastNewsReaderCardEditor extends HTMLElement {
         <select id="fnr-topics-mode">
           <option value="categories">Article categories</option>
           <option value="sources">Source feeds</option>
+          <option value="themes">Themes (curated per feed)</option>
         </select>
-        <span class="hint">Only applies when "Topics" is enabled.</span>
+        <span class="hint">Only applies when "Topics" is enabled. The mode toggle in the card cycles through all three at runtime.</span>
       </div>
     `;
 
@@ -1425,6 +1426,7 @@ class FastNewsReaderCard extends HTMLElement {
       const channel = stateObj.attributes.channel || {};
       const sourceTitle = channel.title || stateObj.attributes.friendly_name || id;
       const sourceIcon = safeHttpUrl(channel.icon || channel.image || "");
+      const sourceThemeLabel = channel.theme_label || channel.theme || null;
       byEntity[id] = sourceTitle;
       iconByEntity[id] = sourceIcon;
       const entries = (stateObj.attributes.entries || [])
@@ -1441,6 +1443,7 @@ class FastNewsReaderCard extends HTMLElement {
           _entityId: id,
           _sourceTitle: sourceTitle,
           _sourceIcon: sourceIcon,
+          _sourceThemeLabel: sourceThemeLabel,
         });
       }
     }
@@ -1450,9 +1453,15 @@ class FastNewsReaderCard extends HTMLElement {
 
   _collectTopics(entries) {
     const set = new Set();
+    let hasUntheme = false;
     if (this._topicsMode === "sources") {
       for (const e of entries) {
         if (e._sourceTitle) set.add(e._sourceTitle);
+      }
+    } else if (this._topicsMode === "themes") {
+      for (const e of entries) {
+        if (e._sourceThemeLabel) set.add(e._sourceThemeLabel);
+        else hasUntheme = true;
       }
     } else {
       for (const e of entries) {
@@ -1461,7 +1470,13 @@ class FastNewsReaderCard extends HTMLElement {
         }
       }
     }
-    return [...set].sort((a, b) => a.localeCompare(b));
+    const sorted = [...set].sort((a, b) => a.localeCompare(b));
+    // Custom feeds without a preset have no theme; surface them under
+    // "Other" so they don't silently disappear when grouping by themes.
+    if (this._topicsMode === "themes" && hasUntheme && sorted.length) {
+      sorted.push("Other");
+    }
+    return sorted;
   }
 
   _buildItemsHtml(visible, isMulti, favorites, saved, locale) {
@@ -1602,6 +1617,12 @@ class FastNewsReaderCard extends HTMLElement {
     if (this._config.show_topics && this._activeTopic) {
       if (this._topicsMode === "sources") {
         out = out.filter((e) => e._sourceTitle === this._activeTopic);
+      } else if (this._topicsMode === "themes") {
+        if (this._activeTopic === "Other") {
+          out = out.filter((e) => !e._sourceThemeLabel);
+        } else {
+          out = out.filter((e) => e._sourceThemeLabel === this._activeTopic);
+        }
       } else {
         out = out.filter((e) =>
           (e.category || []).includes(this._activeTopic)
@@ -1733,15 +1754,21 @@ class FastNewsReaderCard extends HTMLElement {
     // could yield something useful (multi-feed, or current mode has topics).
     const showTopicsBar =
       this._config.show_topics && (topicList.length > 0 || feedCount > 1);
+    const MODE_LABELS = {
+      categories: "Topics",
+      sources: "Sources",
+      themes: "Themes",
+    };
+    const MODE_TITLES = {
+      categories: "article categories from each feed's <category> tags",
+      sources: "the source feed each article comes from",
+      themes: "the curated theme assigned to each feed (news, tech, sport, ...)",
+    };
     const modeToggleHtml = showTopicsBar
       ? `<button class="topic-mode-btn" type="button"
-                title="Currently grouped by ${
-                  this._topicsMode === "sources" ? "source feeds" : "article categories"
-                }. Click to switch."
+                title="Currently grouped by ${MODE_TITLES[this._topicsMode] || ""}. Click to switch."
                 aria-label="Switch grouping mode">
-          <span class="mode-label">${
-            this._topicsMode === "sources" ? "Sources" : "Topics"
-          }</span>
+          <span class="mode-label">${MODE_LABELS[this._topicsMode] || "Topics"}</span>
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
             <path fill="currentColor" d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/>
           </svg>
@@ -1883,8 +1910,9 @@ class FastNewsReaderCard extends HTMLElement {
     const modeBtn = this.shadowRoot.querySelector(".topic-mode-btn");
     if (modeBtn) {
       modeBtn.addEventListener("click", () => {
-        this._topicsMode =
-          this._topicsMode === "sources" ? "categories" : "sources";
+        const order = ["categories", "sources", "themes"];
+        const idx = order.indexOf(this._topicsMode);
+        this._topicsMode = order[(idx + 1) % order.length];
         // Active topic from previous mode almost certainly does not exist
         // in the new mode; reset so the user starts fresh.
         this._activeTopic = null;

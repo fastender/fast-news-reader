@@ -8,6 +8,36 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] - 2026-04-26
+
+### Added
+
+- **Themes mode in the topics bar.** A third grouping option alongside
+  Topics (article-level RSS categories) and Sources (per-feed). Themes
+  groups by the curated category we assign each preset at setup
+  (`news`, `tech`, `science`, `sport`, `business`). Heise lands in
+  Tech, Tagesschau in News, Kicker in Sport, and so on. The
+  in-card mode toggle now cycles Topics → Sources → Themes → Topics,
+  and the same option is available in the editor's "Topics group by"
+  dropdown.
+- **`channel.theme` and `channel.theme_label` on the sensor.** Public
+  schema fields, documented in [docs/SCHEMA.md](SCHEMA.md), so
+  downstream cards like Fast Search Card can group by the curated
+  theme without re-deriving it. `theme` is the slug, `theme_label` is
+  the display string.
+- **Custom feeds without a theme cluster under "Other".** When at least
+  one configured feed has a theme but a custom-URL entry does not, the
+  Themes mode shows an extra "Other" tab so those articles are still
+  reachable.
+
+### Changed
+
+- Preset setup now stores the theme in `entry.data` (`CONF_THEME`).
+  Existing entries that pre-date this field reverse-derive their theme
+  by looking up their stored URL against the preset list, so no manual
+  re-add is needed; if the URL is custom and not in the preset list,
+  the theme is `None`.
+
 ## [0.12.0] - 2026-04-26
 
 ### Added
@@ -293,6 +323,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.13.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.0
 [0.12.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.12.0
 [0.11.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.1

@@ -28,6 +28,8 @@ Each configured feed becomes one `sensor.<name>` entity. The schema is **drop-in
 | `description` | `str \| None` | `<subtitle>` (Atom) or `<description>` (RSS) |
 | `image` | `str \| None` | Channel-level logo URL from the feed itself |
 | `icon` | `str \| None` | Favicon URL, usable as a 16x16 source badge. Derived from `channel.link` (or the feed URL) as `${origin}/favicon.ico` when the feed does not advertise its own. **Public contract for downstream cards** like Fast Search Card; available since v0.9.0. |
+| `theme` | `str \| None` | Curated theme slug for the feed (`"news"`, `"tech"`, `"science"`, `"sport"`, `"business"`). Set during preset setup, reverse-derived from the feed URL for entries that pre-date the field. `None` for custom feeds not in the preset list. **Public contract**; available since v0.13.0. |
+| `theme_label` | `str \| None` | Display label for `theme` (e.g. `"Tech"`, `"News"`). |
 | `language` | `str \| None` | e.g. `"de-DE"` |
 
 ### `entries[]`
