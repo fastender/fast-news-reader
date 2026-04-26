@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.10.0";
+const CARD_VERSION = "0.10.1";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -415,6 +415,11 @@ class FastNewsReaderCardEditor extends HTMLElement {
         <input id="fnr-max" type="number" min="1" max="50" step="1">
       </div>
       <div class="row">
+        <label class="lbl" for="fnr-list-h">Max list height (px)</label>
+        <input id="fnr-list-h" type="number" min="100" step="20" placeholder="auto">
+        <span class="hint">Empty = grow with content. Otherwise the article list scrolls when it exceeds this height; the search bar and topics stay pinned.</span>
+      </div>
+      <div class="row">
         <label class="lbl">Show in card</label>
         <div class="toggles">
           <label class="toggle"><input id="fnr-img" type="checkbox"> Image</label>
@@ -458,6 +463,18 @@ class FastNewsReaderCardEditor extends HTMLElement {
     this.querySelector("#fnr-max").addEventListener("input", (e) => {
       const n = parseInt(e.target.value, 10);
       this._config = { ...this._config, max_items: isNaN(n) ? 5 : n };
+      this._emit();
+    });
+    this.querySelector("#fnr-list-h").addEventListener("input", (e) => {
+      const v = e.target.value.trim();
+      const n = parseInt(v, 10);
+      const next = { ...this._config };
+      if (v === "" || !Number.isFinite(n) || n <= 0) {
+        delete next.max_list_height;
+      } else {
+        next.max_list_height = n;
+      }
+      this._config = next;
       this._emit();
     });
     this.querySelector("#fnr-img").addEventListener("change", (e) => {
@@ -602,6 +619,8 @@ class FastNewsReaderCardEditor extends HTMLElement {
     q("#fnr-search").checked = !!this._config.show_search;
     q("#fnr-topics").checked = !!this._config.show_topics;
     q("#fnr-topics-mode").value = this._config.topics_mode || "categories";
+    q("#fnr-list-h").value =
+      this._config.max_list_height != null ? this._config.max_list_height : "";
   }
 }
 
@@ -1496,6 +1515,11 @@ class FastNewsReaderCard extends HTMLElement {
       })
       .join("");
 
+    const listStyle =
+      this._config.max_list_height && Number(this._config.max_list_height) > 0
+        ? ` style="max-height: ${Number(this._config.max_list_height)}px; overflow-y: auto;"`
+        : "";
+
     this._renderShell(`
       <div class="header">
         ${headerIconHtml}
@@ -1505,7 +1529,7 @@ class FastNewsReaderCard extends HTMLElement {
       ${warningHtml}
       ${searchHtml}
       ${topicsHtml}
-      <div class="list">${itemsHtml}</div>
+      <div class="list"${listStyle}>${itemsHtml}</div>
     `);
 
     this.shadowRoot.querySelectorAll(".article").forEach((el) => {

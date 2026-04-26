@@ -1,6 +1,6 @@
 [project]
 name = "fast-news-reader"
-version = "0.10.0"
+version = "0.10.1"
 description = "Home Assistant custom integration: RSS reader with full image extraction (incl. content:encoded)."
 readme = "README.md"
 requires-python = ">=3.12"

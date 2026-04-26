@@ -8,6 +8,19 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-04-26
+
+### Added
+
+- **`max_list_height` card option.** A new optional setting in the card
+  editor. Empty (the default) keeps the existing behaviour: the card
+  grows to fit every visible article. Set a pixel value and only the
+  article list scrolls when its content exceeds that height; the
+  header, the unavailable-feed warning, the search box, and the topic
+  tabs stay pinned at the top so they remain reachable. Useful when a
+  feed (or a multi-feed merge) produces enough entries to make the
+  card dominate the dashboard.
+
 ## [0.10.0] - 2026-04-26
 
 ### Added
@@ -190,6 +203,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.10.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.0
 [0.9.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.9.0
 [0.8.9]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.9
