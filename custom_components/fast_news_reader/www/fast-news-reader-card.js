@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.11.1";
+const CARD_VERSION = "0.11.2";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1089,20 +1089,50 @@ const CARD_STYLES = `
     outline: none;
     border-color: var(--primary-color, #FF6B4A);
   }
+  .topics-wrap {
+    position: relative;
+    margin-top: 12px;
+  }
+  .topics-wrap::before,
+  .topics-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 200ms ease;
+  }
+  .topics-wrap::before {
+    left: 0;
+    background: linear-gradient(
+      to right,
+      var(--ha-card-background, var(--card-background-color, #fff)) 0%,
+      transparent 100%
+    );
+  }
+  .topics-wrap::after {
+    right: 0;
+    background: linear-gradient(
+      to left,
+      var(--ha-card-background, var(--card-background-color, #fff)) 0%,
+      transparent 100%
+    );
+  }
+  .topics-wrap.at-start::before { opacity: 0; }
+  .topics-wrap.at-end::after { opacity: 0; }
   .topics {
     display: flex;
     gap: 6px;
-    padding: 12px 16px 0;
+    padding: 0 16px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    scrollbar-width: thin;
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE/Edge legacy */
     -webkit-overflow-scrolling: touch;
   }
-  .topics::-webkit-scrollbar { height: 4px; }
-  .topics::-webkit-scrollbar-thumb {
-    background: var(--divider-color);
-    border-radius: 2px;
-  }
+  .topics::-webkit-scrollbar { display: none; }
   .topic {
     flex: 0 0 auto;
     padding: 6px 12px;
@@ -1389,6 +1419,128 @@ class FastNewsReaderCard extends HTMLElement {
     return [...set].sort((a, b) => a.localeCompare(b));
   }
 
+  _buildItemsHtml(visible, isMulti, favorites, saved, locale) {
+    return visible
+      .map((e, idx) => {
+        const id = articleId(e);
+        const imgSrc = this._config.show_image ? safeHttpUrl(e.image || "") : "";
+        const hasImg = !!imgSrc;
+        const summary = this._config.show_summary && e.summary
+          ? `<div class="summary">${escapeHtml(stripHtml(e.summary))}</div>`
+          : "";
+        const metaParts = [];
+        if (this._config.show_date && e.published) {
+          metaParts.push(`<span>${escapeHtml(relativeTime(e.published, locale))}</span>`);
+        }
+        if (isMulti) {
+          const tagIcon = e._sourceIcon
+            ? `<img class="src-icon-sm" src="${escapeHtml(e._sourceIcon)}" alt="" loading="lazy" onerror="this.remove()">`
+            : "";
+          metaParts.push(
+            `<span class="source-tag">${tagIcon}${escapeHtml(e._sourceTitle || "")}</span>`
+          );
+        } else if (e.author) {
+          metaParts.push(`<span>${escapeHtml(e.author)}</span>`);
+        }
+        const meta = metaParts.length
+          ? `<div class="meta">${metaParts.join('<span class="dot">·</span>')}</div>`
+          : "";
+
+        const badges = [];
+        if (favorites.has(id)) badges.push("★");
+        if (saved.has(id)) badges.push("🔖");
+        const badge = badges.length
+          ? `<span class="badge">${badges.join("")}</span>`
+          : "";
+
+        return `
+          <div class="article ${hasImg ? "" : "no-image"}" data-idx="${idx}" role="button" tabindex="0">
+            ${hasImg ? `<img class="thumb" src="${escapeHtml(imgSrc)}" loading="lazy" alt="">` : ""}
+            <div class="body">
+              <div class="title-row">
+                <div class="title">${escapeHtml(e.title || "")}</div>
+                ${badge}
+              </div>
+              ${summary}
+              ${meta}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  _attachArticleHandlers(visible, byEntity) {
+    this.shadowRoot.querySelectorAll(".article").forEach((el) => {
+      const idx = Number(el.dataset.idx);
+      el.addEventListener("click", () => this._openModal(idx, visible, byEntity));
+      el.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          this._openModal(idx, visible, byEntity);
+        }
+      });
+    });
+  }
+
+  // Surgical update used by the search input handler. Only touches the
+  // article list and the count; leaves the search input alive so focus
+  // and caret position stay where the user is typing.
+  _refreshFilteredView() {
+    if (!this._hass || !this._config) return;
+    const { entries: agg, byEntity } = this._aggregateEntries();
+    const filtered = this._applyFilters(agg);
+    const totalAvailable = filtered.length;
+    const visible = filtered.slice(0, this._config.max_items);
+    const isMulti = this._config.entities.length > 1;
+    const favorites = ArticleStore.load("favorite");
+    const saved = ArticleStore.load("saved");
+    const locale = this._hass?.locale?.language || "en";
+
+    const feedCount = this._config.entities.length;
+    const articleNoun = totalAvailable === 1 ? "article" : "articles";
+    const fromText =
+      feedCount > 1 ? ` from ${feedCount} feed${feedCount === 1 ? "" : "s"}` : "";
+    const countEl = this.shadowRoot.querySelector(".count");
+    if (countEl) countEl.textContent = `${totalAvailable} ${articleNoun}${fromText}`;
+
+    const filterActive =
+      (this._config.show_search && this._searchQuery.trim()) ||
+      (this._config.show_topics && this._activeTopic);
+
+    const listEl = this.shadowRoot.querySelector(".list");
+    const emptyEl = this.shadowRoot.querySelector(".empty");
+
+    if (visible.length === 0) {
+      const msg = filterActive ? "No matches." : "No entries.";
+      if (emptyEl) {
+        emptyEl.textContent = msg;
+      } else if (listEl) {
+        listEl.outerHTML = `<div class="empty">${msg}</div>`;
+      }
+      return;
+    }
+
+    const itemsHtml = this._buildItemsHtml(
+      visible,
+      isMulti,
+      favorites,
+      saved,
+      locale
+    );
+
+    if (listEl) {
+      listEl.innerHTML = itemsHtml;
+    } else if (emptyEl) {
+      const listStyle =
+        this._config.max_list_height && Number(this._config.max_list_height) > 0
+          ? ` style="max-height: ${Number(this._config.max_list_height)}px; overflow-y: auto;"`
+          : "";
+      emptyEl.outerHTML = `<div class="list"${listStyle}>${itemsHtml}</div>`;
+    }
+    this._attachArticleHandlers(visible, byEntity);
+  }
+
   _applyFilters(entries) {
     const q = (this._searchQuery || "").trim().toLowerCase();
     let out = entries;
@@ -1533,19 +1685,21 @@ class FastNewsReaderCard extends HTMLElement {
         </button>`
       : "";
     const topicsHtml = showTopicsBar
-      ? `<div class="topics" role="tablist">
-          ${modeToggleHtml}
-          <button class="topic ${this._activeTopic == null ? "active" : ""}"
-                  data-topic="" role="tab"
-                  aria-selected="${this._activeTopic == null}">All</button>
-          ${topicList
-            .map(
-              (t) =>
-                `<button class="topic ${this._activeTopic === t ? "active" : ""}"
-                         data-topic="${escapeHtml(t)}" role="tab"
-                         aria-selected="${this._activeTopic === t}">${escapeHtml(t)}</button>`
-            )
-            .join("")}
+      ? `<div class="topics-wrap at-start">
+          <div class="topics" role="tablist">
+            ${modeToggleHtml}
+            <button class="topic ${this._activeTopic == null ? "active" : ""}"
+                    data-topic="" role="tab"
+                    aria-selected="${this._activeTopic == null}">All</button>
+            ${topicList
+              .map(
+                (t) =>
+                  `<button class="topic ${this._activeTopic === t ? "active" : ""}"
+                           data-topic="${escapeHtml(t)}" role="tab"
+                           aria-selected="${this._activeTopic === t}">${escapeHtml(t)}</button>`
+              )
+              .join("")}
+          </div>
         </div>`
       : "";
 
@@ -1567,54 +1721,13 @@ class FastNewsReaderCard extends HTMLElement {
       return;
     }
 
-    const itemsHtml = visible
-      .map((e, idx) => {
-        const id = articleId(e);
-        const imgSrc = this._config.show_image ? safeHttpUrl(e.image || "") : "";
-        const hasImg = !!imgSrc;
-        const summary = this._config.show_summary && e.summary
-          ? `<div class="summary">${escapeHtml(stripHtml(e.summary))}</div>`
-          : "";
-        const metaParts = [];
-        if (this._config.show_date && e.published) {
-          metaParts.push(`<span>${escapeHtml(relativeTime(e.published, locale))}</span>`);
-        }
-        if (isMulti) {
-          const tagIcon = e._sourceIcon
-            ? `<img class="src-icon-sm" src="${escapeHtml(e._sourceIcon)}" alt="" loading="lazy" onerror="this.remove()">`
-            : "";
-          metaParts.push(
-            `<span class="source-tag">${tagIcon}${escapeHtml(e._sourceTitle || "")}</span>`
-          );
-        } else if (e.author) {
-          metaParts.push(`<span>${escapeHtml(e.author)}</span>`);
-        }
-        const meta = metaParts.length
-          ? `<div class="meta">${metaParts.join('<span class="dot">·</span>')}</div>`
-          : "";
-
-        const badges = [];
-        if (favorites.has(id)) badges.push("★");
-        if (saved.has(id)) badges.push("🔖");
-        const badge = badges.length
-          ? `<span class="badge">${badges.join("")}</span>`
-          : "";
-
-        return `
-          <div class="article ${hasImg ? "" : "no-image"}" data-idx="${idx}" role="button" tabindex="0">
-            ${hasImg ? `<img class="thumb" src="${escapeHtml(imgSrc)}" loading="lazy" alt="">` : ""}
-            <div class="body">
-              <div class="title-row">
-                <div class="title">${escapeHtml(e.title || "")}</div>
-                ${badge}
-              </div>
-              ${summary}
-              ${meta}
-            </div>
-          </div>
-        `;
-      })
-      .join("");
+    const itemsHtml = this._buildItemsHtml(
+      visible,
+      isMulti,
+      favorites,
+      saved,
+      locale
+    );
 
     const listStyle =
       this._config.max_list_height && Number(this._config.max_list_height) > 0
@@ -1634,32 +1747,30 @@ class FastNewsReaderCard extends HTMLElement {
       <div class="list"${listStyle}>${itemsHtml}</div>
     `);
 
-    this.shadowRoot.querySelectorAll(".article").forEach((el) => {
-      const idx = Number(el.dataset.idx);
-      el.addEventListener("click", () => this._openModal(idx, visible, byEntity));
-      el.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") {
-          ev.preventDefault();
-          this._openModal(idx, visible, byEntity);
-        }
-      });
-    });
-
+    this._attachArticleHandlers(visible, byEntity);
     this._attachInteractiveHandlers(focusedSearch, caretPos);
   }
 
   _attachInteractiveHandlers(prevFocusedSearch, prevCaretPos) {
     const searchEl = this.shadowRoot.querySelector(".search-input");
     if (searchEl) {
+      // Use the surgical refresh: only touch the article list and the
+      // count, never rebuild the shell. Otherwise the search input gets
+      // destroyed mid-keystroke and focus is lost after the first letter.
       searchEl.addEventListener("input", (ev) => {
         this._searchQuery = ev.target.value;
-        this._render();
+        this._refreshFilteredView();
       });
       // HA listens for single-letter keyboard shortcuts (`a` opens Assist,
       // `e` opens entity search, etc.) at the document level. Without this
       // those shortcuts hijack typing in our search box after the first
-      // keystroke. Keep the event inside the input.
-      searchEl.addEventListener("keydown", (ev) => ev.stopPropagation());
+      // keystroke. Keep the event inside the input. Capture phase so we
+      // run before any document-level handler attached at capture too.
+      searchEl.addEventListener(
+        "keydown",
+        (ev) => ev.stopPropagation(),
+        true
+      );
       // Restore focus if user was typing when a refresh forced a re-render.
       if (prevFocusedSearch) {
         searchEl.focus();
@@ -1688,6 +1799,22 @@ class FastNewsReaderCard extends HTMLElement {
         this._activeTopic = null;
         this._render();
       });
+    }
+
+    const topicsWrap = this.shadowRoot.querySelector(".topics-wrap");
+    const topicsEl = topicsWrap?.querySelector(".topics");
+    if (topicsWrap && topicsEl) {
+      const updateFades = () => {
+        const atStart = topicsEl.scrollLeft <= 1;
+        const atEnd =
+          topicsEl.scrollLeft + topicsEl.clientWidth >= topicsEl.scrollWidth - 1;
+        topicsWrap.classList.toggle("at-start", atStart);
+        topicsWrap.classList.toggle("at-end", atEnd);
+      };
+      topicsEl.addEventListener("scroll", updateFades, { passive: true });
+      // Run once after layout so the at-end class lands correctly when the
+      // pills fit without scrolling.
+      requestAnimationFrame(updateFades);
     }
 
     const refreshBtn = this.shadowRoot.querySelector(".refresh-btn");

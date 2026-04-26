@@ -8,6 +8,30 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.2] - 2026-04-26
+
+### Fixed
+
+- **Search input no longer loses focus after the first character.** The
+  0.10.2 fix stopped HA from grabbing single-letter shortcuts, but
+  every keystroke still triggered a full shadow-DOM rebuild that
+  destroyed and recreated the input. The first letter went in (because
+  the user's click had focused it), then focus was effectively lost
+  on the freshly created element and the second keystroke went
+  nowhere. The input handler now uses a surgical update that only
+  rewrites the article list and the count, leaving the search input
+  alive across keystrokes.
+
+### Changed
+
+- **Topics bar uses iOS-style fade indicators instead of a scrollbar.**
+  The thin horizontal scrollbar is hidden on every platform (Firefox
+  via `scrollbar-width: none`, WebKit via `::-webkit-scrollbar`,
+  legacy IE via `-ms-overflow-style`). Edge gradients fade in and out
+  based on the scroll position: when there is more content to the
+  right, a soft fade hints at it; when scrolled to the end, the
+  right-side fade disappears. Same for the left edge.
+
 ## [0.11.1] - 2026-04-26
 
 ### Changed
@@ -254,6 +278,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.11.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.1
 [0.11.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.0
 [0.10.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.2
