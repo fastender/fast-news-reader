@@ -1,6 +1,7 @@
 """Tests for the URL and feed-body validation helpers in config_flow."""
 from __future__ import annotations
 
+import aiohttp
 import pytest
 
 from custom_components.fast_news_reader.config_flow import (
@@ -84,8 +85,10 @@ async def test_validate_feed_invalid_url_returns_invalid(hass) -> None:
     assert await _validate_feed(hass, "ftp://example.com/x") == "invalid_url"
 
 
-async def test_validate_feed_404_returns_fetch_failed(hass, aioclient_mock) -> None:
-    aioclient_mock.get("https://example.com/feed.xml", status=404)
+async def test_validate_feed_client_error_returns_fetch_failed(hass, aioclient_mock) -> None:
+    aioclient_mock.get(
+        "https://example.com/feed.xml", exc=aiohttp.ClientError("boom")
+    )
     assert (
         await _validate_feed(hass, "https://example.com/feed.xml") == "fetch_failed"
     )
