@@ -8,6 +8,20 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.15.3] - 2026-04-26
+
+### Added
+
+- **Three new German tech presets.** All three respond, all three
+  produce images via the existing extractor:
+  - ComputerBase
+  - WinFuture
+  - Caschys Blog (stadt-bremerhaven.de)
+
+  Pickable from the curated dropdown during setup; existing custom
+  entries that point at any of these URLs auto-derive `theme = "tech"`
+  on next reload via the URL fallback in the coordinator.
+
 ## [0.15.2] - 2026-04-26
 
 ### Added
@@ -418,6 +432,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.15.3]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.3
 [0.15.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.2
 [0.15.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.1
 [0.15.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.0
