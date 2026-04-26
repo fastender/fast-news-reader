@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.11.2";
+const CARD_VERSION = "0.12.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -193,7 +193,7 @@ function serializeFeeds(feeds) {
 // this; they listen for "fnr:state-changed" so any action propagates.
 // ===========================================================================
 
-const ACTIONS = ["saved", "favorite", "hidden"];
+const ACTIONS = ["saved", "favorite", "hidden", "viewed"];
 
 // Decoded sets are cached here so the card list doesn't re-parse the JSON
 // payload three times per render plus once per article. Cache is updated
@@ -230,6 +230,17 @@ const ArticleStore = {
   },
   has(category, id) {
     return this._read(category).has(id);
+  },
+  add(category, id) {
+    const set = this._read(category);
+    if (set.has(id)) return false;
+    const next = new Set(set);
+    next.add(id);
+    this.save(category, next);
+    window.dispatchEvent(
+      new CustomEvent("fnr:state-changed", { detail: { category, id } })
+    );
+    return true;
   },
   toggle(category, id) {
     const set = new Set(this._read(category));
@@ -953,6 +964,8 @@ class FastNewsReaderModal extends HTMLElement {
   _fill() {
     const e = this._entries[this._index];
     if (!e) return;
+    // Mark as viewed so the "Unread" filter knows what's been opened.
+    ArticleStore.add("viewed", articleId(e));
     const r = this._refs;
     const sourceTitle = this._sourceTitleFor(e);
     const html = sanitizeHtml(e.content || e.summary || "", e.image || "");
@@ -1174,6 +1187,32 @@ const CARD_STYLES = `
     background: var(--secondary-background-color);
     color: var(--primary-text-color);
   }
+  .filter-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--divider-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease,
+      border-color 120ms ease;
+  }
+  .filter-btn svg { display: block; }
+  .filter-btn:hover {
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+  }
+  .filter-btn[data-active="true"] {
+    background: var(--primary-color, #FF6B4A);
+    border-color: var(--primary-color, #FF6B4A);
+    color: var(--text-primary-color, #fff);
+  }
   .refresh-btn {
     flex: 0 0 auto;
     width: 30px; height: 30px;
@@ -1271,6 +1310,9 @@ class FastNewsReaderCard extends HTMLElement {
     this._searchQuery = "";
     this._activeTopic = null;
     this._topicsMode = null; // resolved from config in setConfig
+    this._showFavoritesOnly = false;
+    this._showSavedOnly = false;
+    this._showUnreadOnly = false;
     this._stateChangedHandler = () => this._render();
   }
 
@@ -1336,6 +1378,9 @@ class FastNewsReaderCard extends HTMLElement {
     this._searchQuery = "";
     this._activeTopic = null;
     this._topicsMode = this._config.topics_mode || "categories";
+    this._showFavoritesOnly = false;
+    this._showSavedOnly = false;
+    this._showUnreadOnly = false;
     this._render();
   }
 
@@ -1506,7 +1551,10 @@ class FastNewsReaderCard extends HTMLElement {
 
     const filterActive =
       (this._config.show_search && this._searchQuery.trim()) ||
-      (this._config.show_topics && this._activeTopic);
+      (this._config.show_topics && this._activeTopic) ||
+      this._showFavoritesOnly ||
+      this._showSavedOnly ||
+      this._showUnreadOnly;
 
     const listEl = this.shadowRoot.querySelector(".list");
     const emptyEl = this.shadowRoot.querySelector(".empty");
@@ -1560,6 +1608,18 @@ class FastNewsReaderCard extends HTMLElement {
         );
       }
     }
+    if (this._showFavoritesOnly) {
+      const favs = ArticleStore.load("favorite");
+      out = out.filter((e) => favs.has(articleId(e)));
+    }
+    if (this._showSavedOnly) {
+      const saved = ArticleStore.load("saved");
+      out = out.filter((e) => saved.has(articleId(e)));
+    }
+    if (this._showUnreadOnly) {
+      const viewed = ArticleStore.load("viewed");
+      out = out.filter((e) => !viewed.has(articleId(e)));
+    }
     return out;
   }
 
@@ -1607,7 +1667,10 @@ class FastNewsReaderCard extends HTMLElement {
     const visible = filtered.slice(0, this._config.max_items);
     const filterActive =
       (this._config.show_search && this._searchQuery.trim()) ||
-      (this._config.show_topics && this._activeTopic);
+      (this._config.show_topics && this._activeTopic) ||
+      this._showFavoritesOnly ||
+      this._showSavedOnly ||
+      this._showUnreadOnly;
 
     const isMulti = this._config.entities.length > 1;
     const headerTitle =
@@ -1684,10 +1747,38 @@ class FastNewsReaderCard extends HTMLElement {
           </svg>
         </button>`
       : "";
+
+    const stateFiltersHtml = showTopicsBar
+      ? `<button class="filter-btn fav-filter" type="button"
+                data-active="${this._showFavoritesOnly}"
+                title="Show only favorites" aria-label="Filter favorites"
+                aria-pressed="${this._showFavoritesOnly}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+          </svg>
+        </button>
+        <button class="filter-btn save-filter" type="button"
+                data-active="${this._showSavedOnly}"
+                title="Show only read-later" aria-label="Filter read-later"
+                aria-pressed="${this._showSavedOnly}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </button>
+        <button class="filter-btn unread-filter" type="button"
+                data-active="${this._showUnreadOnly}"
+                title="Show only unread" aria-label="Filter unread"
+                aria-pressed="${this._showUnreadOnly}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="6" fill="currentColor"/>
+          </svg>
+        </button>`
+      : "";
     const topicsHtml = showTopicsBar
       ? `<div class="topics-wrap at-start">
           <div class="topics" role="tablist">
             ${modeToggleHtml}
+            ${stateFiltersHtml}
             <button class="topic ${this._activeTopic == null ? "active" : ""}"
                     data-topic="" role="tab"
                     aria-selected="${this._activeTopic == null}">All</button>
@@ -1797,6 +1888,28 @@ class FastNewsReaderCard extends HTMLElement {
         // Active topic from previous mode almost certainly does not exist
         // in the new mode; reset so the user starts fresh.
         this._activeTopic = null;
+        this._render();
+      });
+    }
+
+    const favFilterBtn = this.shadowRoot.querySelector(".fav-filter");
+    if (favFilterBtn) {
+      favFilterBtn.addEventListener("click", () => {
+        this._showFavoritesOnly = !this._showFavoritesOnly;
+        this._render();
+      });
+    }
+    const saveFilterBtn = this.shadowRoot.querySelector(".save-filter");
+    if (saveFilterBtn) {
+      saveFilterBtn.addEventListener("click", () => {
+        this._showSavedOnly = !this._showSavedOnly;
+        this._render();
+      });
+    }
+    const unreadFilterBtn = this.shadowRoot.querySelector(".unread-filter");
+    if (unreadFilterBtn) {
+      unreadFilterBtn.addEventListener("click", () => {
+        this._showUnreadOnly = !this._showUnreadOnly;
         this._render();
       });
     }

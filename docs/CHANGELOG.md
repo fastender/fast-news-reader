@@ -8,6 +8,21 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-04-26
+
+### Added
+
+- **State filter pills in the topics bar.** Three round icon buttons sit
+  next to the source/category mode toggle: a star (favorites only), a
+  bookmark (read-later only), and a dot (unread only). Each toggles
+  independently, so combinations like "starred and still unread" work.
+  Active filters fill the pill in the primary color, matching the
+  active topic style.
+- **Per-article `viewed` state.** The reader modal marks an article as
+  viewed the moment it appears, so the unread filter actually means
+  something. Stored in localStorage alongside saved/favorite/hidden.
+  Cross-tab sync via the existing `storage` event invalidation.
+
 ## [0.11.2] - 2026-04-26
 
 ### Fixed
@@ -278,6 +293,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.12.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.12.0
 [0.11.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.1
 [0.11.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.0
