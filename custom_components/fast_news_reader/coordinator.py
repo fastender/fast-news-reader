@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 import aiohttp
 import feedparser
@@ -27,6 +28,20 @@ from .const import (
 from .image_extractor import extract_image
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _derive_favicon(*candidate_urls: str | None) -> str | None:
+    """Pick the first http(s) URL we can parse a host off and return its
+    `${scheme}://${host}/favicon.ico`. Used as the channel-level icon
+    when the RSS feed itself does not advertise one. Cheap, deterministic,
+    no network. The card hides the image on 404 via `<img onerror>`."""
+    for raw in candidate_urls:
+        if not raw:
+            continue
+        parsed = urlparse(raw)
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+    return None
 
 
 class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -77,11 +92,13 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         image_url = None
         if image := feed.get("image"):
             image_url = image.get("href") or image.get("url")
+        link = feed.get("link")
         return {
             "title": feed.get("title", self.feed_name),
-            "link": feed.get("link"),
+            "link": link,
             "description": feed.get("subtitle") or feed.get("description"),
             "image": image_url,
+            "icon": _derive_favicon(link, self.feed_url),
             "language": feed.get("language"),
         }
 

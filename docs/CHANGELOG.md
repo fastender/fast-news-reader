@@ -8,6 +8,29 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-04-26
+
+### Added
+
+- **Source favicons in the Lovelace card.** The header of a single-feed
+  card and the small source-tag in a multi-feed card now render the
+  source's favicon next to the name (the same idea Feedly uses). The
+  card looks for `channel.icon` on the sensor's state attributes and
+  drops the image silently if it 404s.
+- **Public `channel.icon` field on the sensor schema.** The coordinator
+  now derives a favicon URL for every feed: it prefers the RSS feed's
+  own `channel.image` if present, otherwise resolves
+  `${origin}/favicon.ico` from `channel.link` (or the feed URL).
+  Documented in [docs/SCHEMA.md](SCHEMA.md) so downstream cards like
+  [Fast Search Card](https://github.com/fastender/Fast-Search-Card)
+  can rely on it without re-deriving the host themselves. Pure
+  derivation, no extra network call during refresh.
+
+### Internal
+
+- Tests cover `_derive_favicon` for the channel-link path, the
+  feed-URL fallback, garbage input, and non-http schemes.
+
 ## [0.8.9] - 2026-04-26
 
 ### Internal
@@ -143,6 +166,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.9.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.9.0
 [0.8.9]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.9
 [0.8.8]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.8
 [0.8.7]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.7

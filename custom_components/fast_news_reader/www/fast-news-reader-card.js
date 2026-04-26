@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.8.9";
+const CARD_VERSION = "0.9.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -976,6 +976,21 @@ const CARD_STYLES = `
     font-weight: 400;
     color: var(--secondary-text-color);
     font-size: 0.85rem;
+    margin-left: auto;
+  }
+  .header .src-icon {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    object-fit: contain;
+    background: var(--secondary-background-color, transparent);
+    flex: 0 0 auto;
+  }
+  .source-tag .src-icon-sm {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 4px;
   }
   .empty {
     padding: 24px 16px;
@@ -1157,6 +1172,7 @@ class FastNewsReaderCard extends HTMLElement {
     const all = [];
     const byEntity = {};
     const sortDesc = (a, b) => entryDate(b) - entryDate(a);
+    const iconByEntity = {};
     for (const feed of this._config.entities) {
       const id = feed.entity;
       const stateObj = this._hass.states[id];
@@ -1164,7 +1180,9 @@ class FastNewsReaderCard extends HTMLElement {
       if (stateObj.state === "unavailable" || stateObj.state === "unknown") continue;
       const channel = stateObj.attributes.channel || {};
       const sourceTitle = channel.title || stateObj.attributes.friendly_name || id;
+      const sourceIcon = safeHttpUrl(channel.icon || channel.image || "");
       byEntity[id] = sourceTitle;
+      iconByEntity[id] = sourceIcon;
       const entries = (stateObj.attributes.entries || [])
         .filter((e) => !hidden.has(articleId(e)));
       // Apply per-feed cap to the newest N (sort first so the cap is stable
@@ -1174,11 +1192,16 @@ class FastNewsReaderCard extends HTMLElement {
           ? [...entries].sort(sortDesc).slice(0, feed.max_items)
           : entries;
       for (const e of limited) {
-        all.push({ ...e, _entityId: id, _sourceTitle: sourceTitle });
+        all.push({
+          ...e,
+          _entityId: id,
+          _sourceTitle: sourceTitle,
+          _sourceIcon: sourceIcon,
+        });
       }
     }
     all.sort(sortDesc);
-    return { entries: all, byEntity };
+    return { entries: all, byEntity, iconByEntity };
   }
 
   _openModal(index, entries, byEntity) {
@@ -1205,16 +1228,20 @@ class FastNewsReaderCard extends HTMLElement {
       return;
     }
 
-    const { entries: agg, byEntity } = this._aggregateEntries();
+    const { entries: agg, byEntity, iconByEntity } = this._aggregateEntries();
     const totalAvailable = agg.length;
     const visible = agg.slice(0, this._config.max_items);
 
+    const isMulti = this._config.entities.length > 1;
     const headerTitle =
       this._config.title ||
-      (this._config.entities.length === 1
+      (!isMulti
         ? byEntity[this._config.entities[0].entity] || ""
         : "Feeds");
-    const isMulti = this._config.entities.length > 1;
+    const headerIcon =
+      !isMulti && !this._config.title
+        ? iconByEntity[this._config.entities[0].entity]
+        : "";
     const favorites = ArticleStore.load("favorite");
     const saved = ArticleStore.load("saved");
 
@@ -1237,10 +1264,13 @@ class FastNewsReaderCard extends HTMLElement {
       : "";
 
     const safeHeader = escapeHtml(headerTitle);
+    const headerIconHtml = headerIcon
+      ? `<img class="src-icon" src="${escapeHtml(headerIcon)}" alt="" loading="lazy" onerror="this.remove()">`
+      : "";
 
     if (!visible.length) {
       this._renderShell(`
-        <div class="header"><span>${safeHeader}</span></div>
+        <div class="header">${headerIconHtml}<span>${safeHeader}</span></div>
         ${warningHtml}
         <div class="empty">No entries.</div>
       `);
@@ -1260,7 +1290,12 @@ class FastNewsReaderCard extends HTMLElement {
           metaParts.push(`<span>${escapeHtml(relativeTime(e.published, locale))}</span>`);
         }
         if (isMulti) {
-          metaParts.push(`<span class="source-tag">${escapeHtml(e._sourceTitle || "")}</span>`);
+          const tagIcon = e._sourceIcon
+            ? `<img class="src-icon-sm" src="${escapeHtml(e._sourceIcon)}" alt="" loading="lazy" onerror="this.remove()">`
+            : "";
+          metaParts.push(
+            `<span class="source-tag">${tagIcon}${escapeHtml(e._sourceTitle || "")}</span>`
+          );
         } else if (e.author) {
           metaParts.push(`<span>${escapeHtml(e.author)}</span>`);
         }
@@ -1293,6 +1328,7 @@ class FastNewsReaderCard extends HTMLElement {
 
     this._renderShell(`
       <div class="header">
+        ${headerIconHtml}
         <span>${safeHeader}</span>
         <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
       </div>

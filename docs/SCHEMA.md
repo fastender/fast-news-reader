@@ -26,7 +26,8 @@ Each configured feed becomes one `sensor.<name>` entity. The schema is **drop-in
 | `title` | `str` | Falls back to user-set name if feed has no title |
 | `link` | `str \| None` | Homepage URL of the feed source |
 | `description` | `str \| None` | `<subtitle>` (Atom) or `<description>` (RSS) |
-| `image` | `str \| None` | Channel-level logo URL |
+| `image` | `str \| None` | Channel-level logo URL from the feed itself |
+| `icon` | `str \| None` | Favicon URL, usable as a 16x16 source badge. Derived from `channel.link` (or the feed URL) as `${origin}/favicon.ico` when the feed does not advertise its own. **Public contract for downstream cards** like Fast Search Card; available since v0.9.0. |
 | `language` | `str \| None` | e.g. `"de-DE"` |
 
 ### `entries[]`

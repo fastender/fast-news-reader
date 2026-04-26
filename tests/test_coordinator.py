@@ -17,7 +17,10 @@ from custom_components.fast_news_reader.const import (
     CONF_SCAN_INTERVAL,
     DOMAIN,
 )
-from custom_components.fast_news_reader.coordinator import FastNewsReaderCoordinator
+from custom_components.fast_news_reader.coordinator import (
+    FastNewsReaderCoordinator,
+    _derive_favicon,
+)
 
 from .conftest import fake_session, load_fixture
 
@@ -32,6 +35,36 @@ def _make_entry(**overrides) -> MockConfigEntry:
     }
     data.update(overrides)
     return MockConfigEntry(domain=DOMAIN, data=data)
+
+
+# ---- _derive_favicon -----------------------------------------------------
+
+
+def test_derive_favicon_from_channel_link() -> None:
+    assert (
+        _derive_favicon("https://www.tagesschau.de", None)
+        == "https://www.tagesschau.de/favicon.ico"
+    )
+
+
+def test_derive_favicon_falls_back_to_feed_url() -> None:
+    assert (
+        _derive_favicon(None, "https://feeds.bbci.co.uk/news/rss.xml")
+        == "https://feeds.bbci.co.uk/favicon.ico"
+    )
+
+
+def test_derive_favicon_strips_path_and_query() -> None:
+    assert (
+        _derive_favicon("https://example.com/news/section?utm=x")
+        == "https://example.com/favicon.ico"
+    )
+
+
+def test_derive_favicon_returns_none_for_garbage() -> None:
+    assert _derive_favicon(None, None) is None
+    assert _derive_favicon("not a url", "") is None
+    assert _derive_favicon("ftp://example.com/x") is None
 
 
 # ---- Date helpers --------------------------------------------------------
