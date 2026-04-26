@@ -9,7 +9,6 @@ from custom_components.fast_news_reader.config_flow import (
     _validate_feed,
 )
 
-
 # ---- _is_valid_url -------------------------------------------------------
 
 
