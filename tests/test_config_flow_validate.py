@@ -1,6 +1,8 @@
 """Tests for the URL and feed-body validation helpers in config_flow."""
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import aiohttp
 import pytest
 
@@ -85,13 +87,32 @@ async def test_validate_feed_invalid_url_returns_invalid(hass) -> None:
     assert await _validate_feed(hass, "ftp://example.com/x") == "invalid_url"
 
 
-async def test_validate_feed_client_error_returns_fetch_failed(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://example.com/feed.xml", exc=aiohttp.ClientError("boom")
-    )
-    assert (
-        await _validate_feed(hass, "https://example.com/feed.xml") == "fetch_failed"
-    )
+async def test_validate_feed_client_error_returns_fetch_failed(hass) -> None:
+    """Patch the session directly to keep aiohttp's connector out of the picture;
+    aioclient_mock's exc= path leaves a lingering safe-shutdown thread that
+    pytest-homeassistant's teardown verifier rejects."""
+    session = MagicMock()
+    session.get = MagicMock(side_effect=aiohttp.ClientError("boom"))
+    with patch(
+        "custom_components.fast_news_reader.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        assert (
+            await _validate_feed(hass, "https://example.com/feed.xml")
+            == "fetch_failed"
+        )
+
+
+async def test_validate_feed_timeout_returns_timeout(hass) -> None:
+    session = MagicMock()
+    session.get = MagicMock(side_effect=TimeoutError())
+    with patch(
+        "custom_components.fast_news_reader.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        assert (
+            await _validate_feed(hass, "https://example.com/feed.xml") == "timeout"
+        )
 
 
 async def test_validate_feed_html_returns_not_a_feed(hass, aioclient_mock) -> None:
