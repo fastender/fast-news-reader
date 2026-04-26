@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/logo@2x.png" alt="Fast News Reader" height="120">
+  <img src="https://raw.githubusercontent.com/fastender/fast-news-reader/main/docs/brand/logo%402x.png" alt="Fast News Reader" height="120">
 </p>
 
 <p align="center">
@@ -9,8 +9,8 @@
 [![GitHub Release](https://img.shields.io/github/v/release/fastender/fast-news-reader?style=flat-square)](https://github.com/fastender/fast-news-reader/releases)
 [![Tests](https://img.shields.io/github/actions/workflow/status/fastender/fast-news-reader/test.yml?branch=main&label=tests&style=flat-square)](https://github.com/fastender/fast-news-reader/actions/workflows/test.yml)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5?style=flat-square)](https://hacs.xyz)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12+-03A9F4?style=flat-square&logo=home-assistant&logoColor=white)](https://www.home-assistant.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.12+-03A9F4?style=flat-square&logo=home-assistant&logoColor=white)](https://www.home-assistant.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-4c1?style=flat-square)](LICENSE)
 [![Works with Fast Search Card](https://img.shields.io/badge/Works%20with-Fast%20Search%20Card-FF6B4A?style=flat-square)](https://github.com/fastender/Fast-Search-Card)
 
 > **Works 100% out of the box with [Fast Search Card](https://github.com/fastender/Fast-Search-Card).** Articles surfaced by Fast News Reader sensors appear in Fast Search Card's results without any extra config.
