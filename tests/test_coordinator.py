@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fast_news_reader.const import (
     CONF_DATE_FORMAT,
@@ -16,7 +17,6 @@ from custom_components.fast_news_reader.const import (
     DOMAIN,
 )
 from custom_components.fast_news_reader.coordinator import FastNewsReaderCoordinator
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .conftest import load_fixture
 

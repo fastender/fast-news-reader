@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.fast_news_reader.const import (
     CONF_FEED_URL,
     CONF_NAME,
@@ -16,7 +18,6 @@ from custom_components.fast_news_reader.sensor import (
     LatestPublishedSensor,
     LatestTitleSensor,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
 def _make_entry() -> MockConfigEntry:
