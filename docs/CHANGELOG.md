@@ -8,6 +8,29 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.9] - 2026-04-26
+
+### Internal
+
+No user-facing changes; this release ships a real test suite so the
+next round of refactors can move with confidence.
+
+- New tests cover the URL allowlist, the feed-body sniff added in
+  0.8.8, every branch of `_validate_feed`, the coordinator's date
+  helpers, the per-entry parse-error swallow, the full update cycle
+  against the bundled Tagesschau fixture, and all three `UpdateFailed`
+  paths (HTTP error, timeout, unparseable body).
+- Sensor tests guard the 0.8.7 `_unrecorded_attributes` declaration as
+  a regression check, plus the main count sensor and all four
+  `latest_*` convenience sensors with and without coordinator data.
+- Test infrastructure: a small `fake_session` helper in
+  `tests/conftest.py` bypasses aiohttp's connector entirely. The
+  alternative, HA's stock `aioclient_mock`, spawns a safe-shutdown
+  daemon thread on first use that the framework's teardown verifier
+  flags as lingering, making test order matter and arbitrary tests
+  fail. The helper avoids that.
+- 56 tests passing in CI in roughly 1.3 seconds.
+
 ## [0.8.8] - 2026-04-26
 
 ### Added
@@ -120,6 +143,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.8.9]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.9
 [0.8.8]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.8
 [0.8.7]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.7
 [0.8.6]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.6
