@@ -8,6 +8,18 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] - 2026-04-26
+
+### Changed
+
+- **Modal action buttons use Material icons.** Read-later, favorite,
+  hide, and close were emoji glyphs (`🔖 ★ ⊘ ×`) which rendered
+  inconsistently across platforms (the bookmark in particular looked
+  faded under some macOS themes). They are now inline Material SVG
+  icons that match the refresh button shipped in 0.11.0, scale
+  cleanly, inherit the primary-color highlight on the active state,
+  and look the same on every browser.
+
 ## [0.11.0] - 2026-04-26
 
 ### Added
@@ -242,6 +254,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.11.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.1
 [0.11.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.0
 [0.10.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.2
 [0.10.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.1
