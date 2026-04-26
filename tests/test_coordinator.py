@@ -112,11 +112,9 @@ async def test_update_parses_real_fixture(hass) -> None:
 
 
 async def test_update_raises_on_http_error(hass) -> None:
-    # raise_for_status() raises ClientResponseError on a 5xx response.
-    err = aiohttp.ClientResponseError(
-        request_info=None, history=(), status=500, message="boom"
-    )
-    session = fake_session(status=500, raise_on_status=err)
+    # raise_for_status() raises ClientResponseError on 5xx; coordinator catches
+    # the broader aiohttp.ClientError, so any subclass works here.
+    session = fake_session(status=500, raise_on_status=aiohttp.ClientError("500"))
     coord = FastNewsReaderCoordinator(hass, _make_entry())
     with _patch_session(session), pytest.raises(UpdateFailed):
         await coord._async_update_data()
