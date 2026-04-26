@@ -1,9 +1,10 @@
 """Tests for FastNewsReaderCoordinator."""
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
+from unittest.mock import patch
 
+import aiohttp
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -18,7 +19,7 @@ from custom_components.fast_news_reader.const import (
 )
 from custom_components.fast_news_reader.coordinator import FastNewsReaderCoordinator
 
-from .conftest import load_fixture
+from .conftest import fake_session, load_fixture
 
 
 def _make_entry(**overrides) -> MockConfigEntry:
@@ -90,42 +91,46 @@ def test_safe_build_entry_swallows_errors(hass, caplog) -> None:
 # ---- Update cycle --------------------------------------------------------
 
 
-async def test_update_parses_real_fixture(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://www.tagesschau.de/xml/rss2/",
-        content=load_fixture("tagesschau.xml"),
-        headers={"Content-Type": "application/rss+xml"},
+def _patch_session(session):
+    return patch(
+        "custom_components.fast_news_reader.coordinator.async_get_clientsession",
+        return_value=session,
     )
+
+
+async def test_update_parses_real_fixture(hass) -> None:
+    session = fake_session(body=load_fixture("tagesschau.xml"))
     entry = _make_entry(feed_url="https://www.tagesschau.de/xml/rss2/")
     coord = FastNewsReaderCoordinator(hass, entry)
-    data = await coord._async_update_data()
+    with _patch_session(session):
+        data = await coord._async_update_data()
     assert data["entries"], "fixture should produce at least one entry"
     assert data["channel"]["title"]
-    # First entry has the standard fields populated by _build_entry.
     e = data["entries"][0]
     for key in ("title", "link", "summary", "image", "published"):
         assert key in e
 
 
-async def test_update_raises_on_http_error(hass, aioclient_mock) -> None:
-    aioclient_mock.get("https://example.com/feed.xml", status=500)
-    coord = FastNewsReaderCoordinator(hass, _make_entry())
-    with pytest.raises(UpdateFailed):
-        await coord._async_update_data()
-
-
-async def test_update_raises_on_timeout(hass, aioclient_mock) -> None:
-    aioclient_mock.get("https://example.com/feed.xml", exc=asyncio.TimeoutError)
-    coord = FastNewsReaderCoordinator(hass, _make_entry())
-    with pytest.raises(UpdateFailed):
-        await coord._async_update_data()
-
-
-async def test_update_raises_on_unparseable_body(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://example.com/feed.xml",
-        text="not xml at all, just garbage",
+async def test_update_raises_on_http_error(hass) -> None:
+    # raise_for_status() raises ClientResponseError on a 5xx response.
+    err = aiohttp.ClientResponseError(
+        request_info=None, history=(), status=500, message="boom"
     )
+    session = fake_session(status=500, raise_on_status=err)
     coord = FastNewsReaderCoordinator(hass, _make_entry())
-    with pytest.raises(UpdateFailed):
+    with _patch_session(session), pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+
+
+async def test_update_raises_on_timeout(hass) -> None:
+    session = fake_session(raise_on_get=TimeoutError())
+    coord = FastNewsReaderCoordinator(hass, _make_entry())
+    with _patch_session(session), pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+
+
+async def test_update_raises_on_unparseable_body(hass) -> None:
+    session = fake_session(body=b"not xml at all, just garbage")
+    coord = FastNewsReaderCoordinator(hass, _make_entry())
+    with _patch_session(session), pytest.raises(UpdateFailed):
         await coord._async_update_data()
