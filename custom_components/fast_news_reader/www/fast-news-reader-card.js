@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.9.0";
+const CARD_VERSION = "0.10.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -321,7 +321,7 @@ const EDITOR_STYLES = `
   }
   .toggles {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 8px;
     margin-top: 4px;
   }
@@ -420,7 +420,17 @@ class FastNewsReaderCardEditor extends HTMLElement {
           <label class="toggle"><input id="fnr-img" type="checkbox"> Image</label>
           <label class="toggle"><input id="fnr-sum" type="checkbox"> Summary</label>
           <label class="toggle"><input id="fnr-date" type="checkbox"> Date</label>
+          <label class="toggle"><input id="fnr-search" type="checkbox"> Search</label>
+          <label class="toggle"><input id="fnr-topics" type="checkbox"> Topics</label>
         </div>
+      </div>
+      <div class="row">
+        <label class="lbl" for="fnr-topics-mode">Topics group by</label>
+        <select id="fnr-topics-mode">
+          <option value="categories">Article categories</option>
+          <option value="sources">Source feeds</option>
+        </select>
+        <span class="hint">Only applies when "Topics" is enabled.</span>
       </div>
     `;
 
@@ -460,6 +470,18 @@ class FastNewsReaderCardEditor extends HTMLElement {
     });
     this.querySelector("#fnr-date").addEventListener("change", (e) => {
       this._config = { ...this._config, show_date: e.target.checked };
+      this._emit();
+    });
+    this.querySelector("#fnr-search").addEventListener("change", (e) => {
+      this._config = { ...this._config, show_search: e.target.checked };
+      this._emit();
+    });
+    this.querySelector("#fnr-topics").addEventListener("change", (e) => {
+      this._config = { ...this._config, show_topics: e.target.checked };
+      this._emit();
+    });
+    this.querySelector("#fnr-topics-mode").addEventListener("change", (e) => {
+      this._config = { ...this._config, topics_mode: e.target.value };
       this._emit();
     });
 
@@ -577,6 +599,9 @@ class FastNewsReaderCardEditor extends HTMLElement {
     q("#fnr-img").checked = this._config.show_image !== false;
     q("#fnr-sum").checked = this._config.show_summary !== false;
     q("#fnr-date").checked = this._config.show_date !== false;
+    q("#fnr-search").checked = !!this._config.show_search;
+    q("#fnr-topics").checked = !!this._config.show_topics;
+    q("#fnr-topics-mode").value = this._config.topics_mode || "categories";
   }
 }
 
@@ -1011,6 +1036,58 @@ const CARD_STYLES = `
     gap: 6px;
   }
   .feed-warning .warn-icon { font-size: 1rem; line-height: 1; }
+  .searchbar {
+    padding: 12px 16px 0;
+  }
+  .search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.9rem;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #FF6B4A);
+  }
+  .topics {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topics::-webkit-scrollbar { height: 4px; }
+  .topics::-webkit-scrollbar-thumb {
+    background: var(--divider-color);
+    border-radius: 2px;
+  }
+  .topic {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    transition: background 120ms ease, border-color 120ms ease,
+      color 120ms ease;
+  }
+  .topic:hover { background: var(--secondary-background-color); }
+  .topic.active {
+    background: var(--primary-color, #FF6B4A);
+    border-color: var(--primary-color, #FF6B4A);
+    color: var(--text-primary-color, #fff);
+  }
   .list { display: flex; flex-direction: column; }
   .article {
     display: grid;
@@ -1079,6 +1156,8 @@ class FastNewsReaderCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._lastStateStamp = null;
+    this._searchQuery = "";
+    this._activeTopic = null;
     this._stateChangedHandler = () => this._render();
   }
 
@@ -1132,11 +1211,17 @@ class FastNewsReaderCard extends HTMLElement {
       show_image: true,
       show_summary: true,
       show_date: true,
+      show_search: false,
+      show_topics: false,
+      topics_mode: "categories",
       ...config,
       entities: feeds,
     };
     delete this._config.entity;
     this._lastStateStamp = null;
+    // Reset interactive state when config changes (eg. after editor save).
+    this._searchQuery = "";
+    this._activeTopic = null;
     this._render();
   }
 
@@ -1204,6 +1289,44 @@ class FastNewsReaderCard extends HTMLElement {
     return { entries: all, byEntity, iconByEntity };
   }
 
+  _collectTopics(entries) {
+    const set = new Set();
+    if (this._config.topics_mode === "sources") {
+      for (const e of entries) {
+        if (e._sourceTitle) set.add(e._sourceTitle);
+      }
+    } else {
+      for (const e of entries) {
+        for (const c of e.category || []) {
+          if (c) set.add(c);
+        }
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }
+
+  _applyFilters(entries) {
+    const q = (this._searchQuery || "").trim().toLowerCase();
+    let out = entries;
+    if (this._config.show_search && q) {
+      out = out.filter((e) => {
+        const title = (e.title || "").toLowerCase();
+        const summary = stripHtml(e.summary || "").toLowerCase();
+        return title.includes(q) || summary.includes(q);
+      });
+    }
+    if (this._config.show_topics && this._activeTopic) {
+      if (this._config.topics_mode === "sources") {
+        out = out.filter((e) => e._sourceTitle === this._activeTopic);
+      } else {
+        out = out.filter((e) =>
+          (e.category || []).includes(this._activeTopic)
+        );
+      }
+    }
+    return out;
+  }
+
   _openModal(index, entries, byEntity) {
     console.info("[fast-news-reader] opening modal for index", index);
     const locale = this._hass?.locale?.language || "en";
@@ -1223,14 +1346,32 @@ class FastNewsReaderCard extends HTMLElement {
     const hass = this._hass;
     const locale = hass?.locale?.language || "en";
 
+    // Capture search-input focus state before we clobber the shadow DOM,
+    // so a state push from HA mid-typing doesn't yank the caret away.
+    const focusedSearch =
+      this.shadowRoot?.activeElement &&
+      this.shadowRoot.activeElement.classList?.contains("search-input")
+        ? this.shadowRoot.activeElement
+        : null;
+    const caretPos = focusedSearch?.selectionStart ?? null;
+
     if (!hass || !this._config.entities?.length) {
       this._renderShell(`<div class="empty">No feed selected.</div>`);
       return;
     }
 
     const { entries: agg, byEntity, iconByEntity } = this._aggregateEntries();
-    const totalAvailable = agg.length;
-    const visible = agg.slice(0, this._config.max_items);
+    const topicList = this._config.show_topics ? this._collectTopics(agg) : [];
+    // Drop a stale active topic that no longer exists after a refresh.
+    if (this._activeTopic && !topicList.includes(this._activeTopic)) {
+      this._activeTopic = null;
+    }
+    const filtered = this._applyFilters(agg);
+    const totalAvailable = filtered.length;
+    const visible = filtered.slice(0, this._config.max_items);
+    const filterActive =
+      (this._config.show_search && this._searchQuery.trim()) ||
+      (this._config.show_topics && this._activeTopic);
 
     const isMulti = this._config.entities.length > 1;
     const headerTitle =
@@ -1268,12 +1409,41 @@ class FastNewsReaderCard extends HTMLElement {
       ? `<img class="src-icon" src="${escapeHtml(headerIcon)}" alt="" loading="lazy" onerror="this.remove()">`
       : "";
 
+    const searchHtml = this._config.show_search
+      ? `<div class="searchbar">
+          <input type="search" class="search-input"
+                 placeholder="Search articles..."
+                 value="${escapeHtml(this._searchQuery)}"
+                 aria-label="Search articles">
+        </div>`
+      : "";
+
+    const topicsHtml = topicList.length
+      ? `<div class="topics" role="tablist">
+          <button class="topic ${this._activeTopic == null ? "active" : ""}"
+                  data-topic="" role="tab"
+                  aria-selected="${this._activeTopic == null}">All</button>
+          ${topicList
+            .map(
+              (t) =>
+                `<button class="topic ${this._activeTopic === t ? "active" : ""}"
+                         data-topic="${escapeHtml(t)}" role="tab"
+                         aria-selected="${this._activeTopic === t}">${escapeHtml(t)}</button>`
+            )
+            .join("")}
+        </div>`
+      : "";
+
     if (!visible.length) {
+      const emptyMsg = filterActive ? "No matches." : "No entries.";
       this._renderShell(`
         <div class="header">${headerIconHtml}<span>${safeHeader}</span></div>
         ${warningHtml}
-        <div class="empty">No entries.</div>
+        ${searchHtml}
+        ${topicsHtml}
+        <div class="empty">${emptyMsg}</div>
       `);
+      this._attachInteractiveHandlers(focusedSearch, caretPos);
       return;
     }
 
@@ -1333,6 +1503,8 @@ class FastNewsReaderCard extends HTMLElement {
         <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
       </div>
       ${warningHtml}
+      ${searchHtml}
+      ${topicsHtml}
       <div class="list">${itemsHtml}</div>
     `);
 
@@ -1344,6 +1516,34 @@ class FastNewsReaderCard extends HTMLElement {
           ev.preventDefault();
           this._openModal(idx, visible, byEntity);
         }
+      });
+    });
+
+    this._attachInteractiveHandlers(focusedSearch, caretPos);
+  }
+
+  _attachInteractiveHandlers(prevFocusedSearch, prevCaretPos) {
+    const searchEl = this.shadowRoot.querySelector(".search-input");
+    if (searchEl) {
+      searchEl.addEventListener("input", (ev) => {
+        this._searchQuery = ev.target.value;
+        this._render();
+      });
+      // Restore focus if user was typing when a refresh forced a re-render.
+      if (prevFocusedSearch) {
+        searchEl.focus();
+        if (prevCaretPos != null) {
+          const len = searchEl.value.length;
+          const pos = Math.min(prevCaretPos, len);
+          searchEl.setSelectionRange(pos, pos);
+        }
+      }
+    }
+    this.shadowRoot.querySelectorAll(".topic").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const t = btn.dataset.topic || null;
+        this._activeTopic = this._activeTopic === t ? null : t;
+        this._render();
       });
     });
   }

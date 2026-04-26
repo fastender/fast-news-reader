@@ -8,6 +8,30 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-04-26
+
+### Added
+
+- **Search field in the card.** Optional, off by default. When enabled,
+  a small search box appears above the article list and live-filters
+  the merged feed against article titles and (HTML-stripped) summaries.
+  Filters apply before `max_items`, so "Top 5 Sport" actually returns
+  five sport articles, not five mixed articles that happen to include
+  three sport ones. Toggle in the card editor under "Show in card".
+- **Horizontally scrollable topic tabs.** Optional, off by default.
+  When enabled, a row of pill buttons sits between the search field
+  and the list. The "All" pill clears the filter; tapping any other
+  pill restricts the list to that topic. Two grouping modes:
+  - `categories` (default): collected from each article's RSS
+    `<category>` tags.
+  - `sources`: one tab per configured feed, useful in multi-feed
+    cards.
+- The empty state now reads "No matches." when search or topic filters
+  are active and exclude every article.
+- Search input keeps focus and caret position across HA-driven
+  re-renders, so typing is not interrupted when a feed sensor
+  refreshes mid-search.
+
 ## [0.9.0] - 2026-04-26
 
 ### Added
@@ -166,6 +190,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.10.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.0
 [0.9.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.9.0
 [0.8.9]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.9
 [0.8.8]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.8
