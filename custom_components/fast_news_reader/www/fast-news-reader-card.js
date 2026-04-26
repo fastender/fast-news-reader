@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.8.4";
+const CARD_VERSION = "0.8.5";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -29,11 +29,40 @@ console.info(
 // Helpers
 // ===========================================================================
 
+// Use DOMParser instead of `innerHTML` on a detached <div> — the latter
+// still fires <img onerror> handlers on some browsers, even off-document.
+const _STRIP_HTML_PARSER = new DOMParser();
 function stripHtml(s) {
   if (!s) return "";
-  const tmp = document.createElement("div");
-  tmp.innerHTML = s;
-  return (tmp.textContent || tmp.innerText || "").trim();
+  try {
+    const doc = _STRIP_HTML_PARSER.parseFromString(String(s), "text/html");
+    return (doc.body?.textContent || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+const _ESCAPE_HTML_MAP = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => _ESCAPE_HTML_MAP[c]);
+}
+
+// Return the URL only when its scheme is http(s) or it is protocol- or
+// root-relative; otherwise drop it. Blocks javascript:, data:, vbscript:,
+// and friends. Used for any RSS-supplied src/href.
+function safeHttpUrl(url) {
+  if (typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//") || trimmed.startsWith("/")) return trimmed;
+  return "";
 }
 
 const ALLOWED_TAGS = new Set([
@@ -76,12 +105,10 @@ function sanitizeHtml(html, heroSrc) {
     }
     [...el.attributes].forEach((attr) => {
       const name = attr.name.toLowerCase();
-      const value = (attr.value || "").trim().toLowerCase();
-      if (name.startsWith("on")) el.removeAttribute(attr.name);
-      else if (name === "href" || name === "src") {
-        if (value.startsWith("javascript:") || value.startsWith("data:")) {
-          el.removeAttribute(attr.name);
-        }
+      if (name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+      } else if (name === "href" || name === "src") {
+        if (!safeHttpUrl(attr.value || "")) el.removeAttribute(attr.name);
       } else if (name === "style") {
         el.removeAttribute(attr.name);
       }
@@ -168,30 +195,44 @@ function serializeFeeds(feeds) {
 
 const ACTIONS = ["saved", "favorite", "hidden"];
 
+// Decoded sets are cached here so the card list doesn't re-parse the JSON
+// payload three times per render plus once per article. Cache is updated
+// in-place on save() and invalidated on cross-tab `storage` events.
 const ArticleStore = {
+  _cache: new Map(),
   _key(category) {
     return `fnr-${category}`;
   },
-  load(category) {
-    try {
-      const raw = localStorage.getItem(this._key(category));
-      return new Set(raw ? JSON.parse(raw) : []);
-    } catch {
-      return new Set();
+  _read(category) {
+    if (!this._cache.has(category)) {
+      let set;
+      try {
+        const raw = localStorage.getItem(this._key(category));
+        set = new Set(raw ? JSON.parse(raw) : []);
+      } catch {
+        set = new Set();
+      }
+      this._cache.set(category, set);
     }
+    return this._cache.get(category);
+  },
+  load(category) {
+    return new Set(this._read(category));
   },
   save(category, set) {
+    const copy = new Set(set);
+    this._cache.set(category, copy);
     try {
-      localStorage.setItem(this._key(category), JSON.stringify([...set]));
+      localStorage.setItem(this._key(category), JSON.stringify([...copy]));
     } catch {
       /* ignore storage errors */
     }
   },
   has(category, id) {
-    return this.load(category).has(id);
+    return this._read(category).has(id);
   },
   toggle(category, id) {
-    const set = this.load(category);
+    const set = new Set(this._read(category));
     const now = !set.has(id);
     if (now) set.add(id);
     else set.delete(id);
@@ -202,6 +243,14 @@ const ArticleStore = {
     return now;
   },
 };
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key && e.key.startsWith("fnr-")) {
+      ArticleStore._cache.delete(e.key.slice(4));
+    }
+  });
+}
 
 // ===========================================================================
 // 1) Visual editor (defined first)
@@ -850,8 +899,9 @@ class FastNewsReaderModal extends HTMLElement {
       r.meta.append(dot, document.createTextNode(e.author));
     }
 
-    if (e.image) {
-      r.hero.src = e.image;
+    const heroSrc = safeHttpUrl(e.image || "");
+    if (heroSrc) {
+      r.hero.src = heroSrc;
       r.hero.classList.remove("hero-fallback");
       r.hero.style.display = "";
     } else {
@@ -860,12 +910,14 @@ class FastNewsReaderModal extends HTMLElement {
       r.hero.style.display = "none";
     }
 
-    r.content.innerHTML = html || `<p>${stripHtml(e.summary || "")}</p>`;
+    r.content.innerHTML = html || `<p>${escapeHtml(stripHtml(e.summary || ""))}</p>`;
 
-    if (e.link) {
-      r.visit.href = e.link;
+    const visitHref = safeHttpUrl(e.link || "");
+    if (visitHref) {
+      r.visit.href = visitHref;
       r.visit.style.display = "";
     } else {
+      r.visit.removeAttribute("href");
       r.visit.style.display = "none";
     }
 
@@ -1137,9 +1189,11 @@ class FastNewsReaderCard extends HTMLElement {
     const favorites = ArticleStore.load("favorite");
     const saved = ArticleStore.load("saved");
 
+    const safeHeader = escapeHtml(headerTitle);
+
     if (!visible.length) {
       this._renderShell(`
-        <div class="header"><span>${headerTitle}</span></div>
+        <div class="header"><span>${safeHeader}</span></div>
         <div class="empty">No entries.</div>
       `);
       return;
@@ -1148,18 +1202,19 @@ class FastNewsReaderCard extends HTMLElement {
     const itemsHtml = visible
       .map((e, idx) => {
         const id = articleId(e);
-        const hasImg = this._config.show_image && e.image;
+        const imgSrc = this._config.show_image ? safeHttpUrl(e.image || "") : "";
+        const hasImg = !!imgSrc;
         const summary = this._config.show_summary && e.summary
-          ? `<div class="summary">${stripHtml(e.summary)}</div>`
+          ? `<div class="summary">${escapeHtml(stripHtml(e.summary))}</div>`
           : "";
         const metaParts = [];
         if (this._config.show_date && e.published) {
-          metaParts.push(`<span>${relativeTime(e.published, locale)}</span>`);
+          metaParts.push(`<span>${escapeHtml(relativeTime(e.published, locale))}</span>`);
         }
         if (isMulti) {
-          metaParts.push(`<span class="source-tag">${e._sourceTitle || ""}</span>`);
+          metaParts.push(`<span class="source-tag">${escapeHtml(e._sourceTitle || "")}</span>`);
         } else if (e.author) {
-          metaParts.push(`<span>${e.author}</span>`);
+          metaParts.push(`<span>${escapeHtml(e.author)}</span>`);
         }
         const meta = metaParts.length
           ? `<div class="meta">${metaParts.join('<span class="dot">·</span>')}</div>`
@@ -1174,10 +1229,10 @@ class FastNewsReaderCard extends HTMLElement {
 
         return `
           <div class="article ${hasImg ? "" : "no-image"}" data-idx="${idx}" role="button" tabindex="0">
-            ${hasImg ? `<img class="thumb" src="${e.image}" loading="lazy" alt="">` : ""}
+            ${hasImg ? `<img class="thumb" src="${escapeHtml(imgSrc)}" loading="lazy" alt="">` : ""}
             <div class="body">
               <div class="title-row">
-                <div class="title">${e.title || ""}</div>
+                <div class="title">${escapeHtml(e.title || "")}</div>
                 ${badge}
               </div>
               ${summary}
@@ -1190,7 +1245,7 @@ class FastNewsReaderCard extends HTMLElement {
 
     this._renderShell(`
       <div class="header">
-        <span>${headerTitle}</span>
+        <span>${safeHeader}</span>
         <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
       </div>
       <div class="list">${itemsHtml}</div>
