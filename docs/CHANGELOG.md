@@ -8,6 +8,29 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.15.2] - 2026-04-26
+
+### Added
+
+- **Theme dropdown in the custom feed flow.** When you paste your own
+  RSS or Atom URL, the setup form now offers a "Theme" picker with the
+  same five curated buckets used by presets (News, Tech, Science,
+  Sport, Business) plus an explicit `(none)` option. The same field
+  appears on the reconfigure step so existing custom feeds can be
+  tagged retroactively. Articles from a tagged custom feed land in
+  the matching tab in the card's themes mode.
+
+### Changed
+
+- **Coordinator distinguishes "theme key absent" from "theme key
+  empty".** Previously both fell back to URL-based theme lookup.
+  Picking `(none)` in the custom flow stored an empty string, which
+  the coordinator then "helpfully" overrode with a URL match if the
+  custom URL happened to be in the preset list. Now an explicit
+  empty value is respected as "no theme on purpose"; URL fallback
+  only kicks in when the key is missing entirely (legacy entries
+  that pre-date the field). Existing data is unaffected.
+
 ## [0.15.1] - 2026-04-26
 
 ### Changed
@@ -395,6 +418,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.15.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.2
 [0.15.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.1
 [0.15.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.0
 [0.14.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.14.0

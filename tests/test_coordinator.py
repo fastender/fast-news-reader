@@ -93,6 +93,19 @@ def test_theme_none_for_unknown_url(hass) -> None:
     assert coord.theme_label is None
 
 
+def test_theme_explicit_empty_overrides_url_fallback(hass) -> None:
+    """If the user explicitly picked '(none)' in the custom flow, respect
+    that even when the URL would otherwise match a preset (e.g. a custom
+    URL that happens to be in the preset list)."""
+    entry = _make_entry(
+        feed_url="https://www.heise.de/rss/heise-atom.xml",
+        theme="",
+    )
+    coord = FastNewsReaderCoordinator(hass, entry)
+    assert coord.theme is None
+    assert coord.theme_label is None
+
+
 # ---- Date helpers --------------------------------------------------------
 
 

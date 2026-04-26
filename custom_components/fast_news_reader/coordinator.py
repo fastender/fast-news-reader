@@ -58,14 +58,16 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.local_time: bool = merged.get(CONF_LOCAL_TIME, DEFAULT_LOCAL_TIME)
 
         # Theme is the curated category from the preset (eg. "tech" for
-        # Heise). Entries added through the preset flow store it directly;
-        # older entries that pre-date the field reverse-derive from the URL
-        # so the user does not have to re-add their feeds.
-        theme: str | None = merged.get(CONF_THEME)
-        if not theme:
+        # Heise). Resolution order:
+        # 1. CONF_THEME present in entry data: respect the user's choice
+        #    verbatim, including "" which means 'no theme on purpose'.
+        # 2. CONF_THEME absent (entry pre-dates the field): reverse-derive
+        #    from the URL so the user does not have to re-add the feed.
+        if CONF_THEME in merged:
+            theme: str | None = merged[CONF_THEME] or None
+        else:
             preset = get_preset_by_url(self.feed_url)
-            if preset:
-                theme = preset["category"]
+            theme = preset["category"] if preset else None
         self.theme: str | None = theme
         self.theme_label: str | None = (
             CATEGORY_LABELS.get(theme) if theme else None

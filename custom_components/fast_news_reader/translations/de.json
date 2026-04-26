@@ -39,6 +39,7 @@
         "data": {
           "name": "Anzeigename",
           "feed_url": "Feed-URL",
+          "theme": "Thema (gruppiert Artikel in der Karte)",
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)",
           "date_format": "Datumsformat (fortgeschritten, strftime)",
           "local_time": "Datum in deiner lokalen Zeitzone anzeigen"
@@ -50,6 +51,7 @@
         "data": {
           "name": "Anzeigename",
           "feed_url": "Feed-URL",
+          "theme": "Thema (gruppiert Artikel in der Karte)",
           "scan_interval": "Wie oft sollen wir nach neuen Beiträgen suchen? (Sekunden)"
         }
       }

@@ -69,6 +69,23 @@ def _looks_like_feed(sample: bytes) -> bool:
     return any(marker in head for marker in _FEED_BODY_MARKERS)
 
 
+def _theme_selector() -> SelectSelector:
+    """Dropdown for the curated theme. The leading empty option lets the
+    user pick 'no theme' explicitly; the coordinator stores that as None
+    and the card surfaces those articles under an "Other" tab in themes
+    mode."""
+    options = [{"value": "", "label": "(none)"}]
+    options.extend(
+        {"value": slug, "label": label} for slug, label in CATEGORY_LABELS.items()
+    )
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=options,
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
 async def _validate_feed(hass: Any, url: str) -> str | None:
     """Live-fetch the URL, return error key or None on success.
 
@@ -345,6 +362,10 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     default=defaults.get(CONF_FEED_URL, ""),
                 ): str,
                 vol.Optional(
+                    CONF_THEME,
+                    default=defaults.get(CONF_THEME, ""),
+                ): _theme_selector(),
+                vol.Optional(
                     CONF_SCAN_INTERVAL,
                     default=int(DEFAULT_SCAN_INTERVAL.total_seconds()),
                 ): int,
@@ -403,6 +424,10 @@ class FastNewsReaderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_FEED_URL,
                     default=defaults.get(CONF_FEED_URL, ""),
                 ): str,
+                vol.Optional(
+                    CONF_THEME,
+                    default=defaults.get(CONF_THEME, "") or "",
+                ): _theme_selector(),
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
                     default=defaults.get(

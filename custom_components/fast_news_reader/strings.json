@@ -39,6 +39,7 @@
         "data": {
           "name": "Display name",
           "feed_url": "Feed URL",
+          "theme": "Theme (used to group articles in the card)",
           "scan_interval": "How often should we check for updates? (seconds)",
           "date_format": "Date format (advanced, strftime)",
           "local_time": "Show dates in your local timezone"
@@ -50,6 +51,7 @@
         "data": {
           "name": "Display name",
           "feed_url": "Feed URL",
+          "theme": "Theme (used to group articles in the card)",
           "scan_interval": "How often should we check for updates? (seconds)"
         }
       }
