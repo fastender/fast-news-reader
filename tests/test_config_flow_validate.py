@@ -1,7 +1,7 @@
 """Tests for the URL and feed-body validation helpers in config_flow."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -115,28 +115,55 @@ async def test_validate_feed_timeout_returns_timeout(hass) -> None:
         )
 
 
-async def test_validate_feed_html_returns_not_a_feed(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://example.com/",
-        text="<!DOCTYPE html><html><body>Welcome</body></html>",
+def _fake_session(*, body: bytes, status: int = 200) -> MagicMock:
+    """Build a session whose `get(url)` returns an async-context-manager
+    response with the given status and body. Avoids aiohttp's connector
+    so pytest-homeassistant's teardown thread check stays happy."""
+    resp = MagicMock()
+    resp.status = status
+    resp.raise_for_status = MagicMock()
+    content = MagicMock()
+    content.read = AsyncMock(return_value=body)
+    resp.content = content
+
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=resp)
+    cm.__aexit__ = AsyncMock(return_value=False)
+
+    session = MagicMock()
+    session.get = MagicMock(return_value=cm)
+    return session
+
+
+async def test_validate_feed_html_returns_not_a_feed(hass) -> None:
+    session = _fake_session(body=b"<!DOCTYPE html><html><body>Welcome</body></html>")
+    with patch(
+        "custom_components.fast_news_reader.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        assert await _validate_feed(hass, "https://example.com/") == "not_a_feed"
+
+
+async def test_validate_feed_real_rss_returns_none(hass) -> None:
+    session = _fake_session(
+        body=(
+            b'<?xml version="1.0" encoding="UTF-8"?>'
+            b"<rss version=\"2.0\"><channel><title>Test</title></channel></rss>"
+        )
     )
-    assert await _validate_feed(hass, "https://example.com/") == "not_a_feed"
+    with patch(
+        "custom_components.fast_news_reader.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        assert await _validate_feed(hass, "https://example.com/feed.xml") is None
 
 
-async def test_validate_feed_real_rss_returns_none(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://example.com/feed.xml",
-        text=(
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            '<rss version="2.0"><channel><title>Test</title></channel></rss>'
-        ),
+async def test_validate_feed_atom_returns_none(hass) -> None:
+    session = _fake_session(
+        body=b'<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>'
     )
-    assert await _validate_feed(hass, "https://example.com/feed.xml") is None
-
-
-async def test_validate_feed_atom_returns_none(hass, aioclient_mock) -> None:
-    aioclient_mock.get(
-        "https://example.com/atom",
-        text='<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>',
-    )
-    assert await _validate_feed(hass, "https://example.com/atom") is None
+    with patch(
+        "custom_components.fast_news_reader.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        assert await _validate_feed(hass, "https://example.com/atom") is None
