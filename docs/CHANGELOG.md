@@ -8,6 +8,23 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] - 2026-04-26
+
+### Changed
+
+- **Toolbar redesign.** The search field, the favorites/read-later/unread
+  state filters, the source/topic mode toggle, and the topic pills all
+  live in one row now, in this order:
+  search, favorites, read-later, unread, mode toggle, topic pills.
+  Previously the search input had its own row above the topic bar.
+- **Search collapses behind an icon.** The search field is no longer
+  permanently visible. A magnifying-glass button at the start of the
+  toolbar opens it on click; the rest of the toolbar hides while
+  search is active. A close button (and the Escape key) clear the
+  query and bring the toolbar back. Saves vertical space when search
+  isn't in use; previously the empty search field sat above every
+  card with `show_search` enabled.
+
 ## [0.13.1] - 2026-04-26
 
 ### Added
@@ -333,6 +350,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.14.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.14.0
 [0.13.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.1
 [0.13.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.0
 [0.12.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.12.0

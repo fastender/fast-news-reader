@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.13.1";
+const CARD_VERSION = "0.14.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1115,14 +1115,18 @@ const CARD_STYLES = `
     gap: 6px;
   }
   .feed-warning .warn-icon { font-size: 1rem; line-height: 1; }
-  .searchbar {
+  .search-row {
+    display: flex;
+    gap: 6px;
     padding: 12px 16px 0;
+    align-items: center;
   }
+  .search-row-input { flex: 1 1 auto; min-width: 0; }
   .search-input {
     width: 100%;
     padding: 8px 12px;
     border: 1px solid var(--divider-color);
-    border-radius: 8px;
+    border-radius: 999px;
     background: var(--card-background-color);
     color: var(--primary-text-color);
     font-size: 0.9rem;
@@ -1339,6 +1343,7 @@ class FastNewsReaderCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._lastStateStamp = null;
     this._searchQuery = "";
+    this._searchOpen = false;
     this._activeTopic = null;
     this._topicsMode = null; // resolved from config in setConfig
     this._showFavoritesOnly = false;
@@ -1407,6 +1412,7 @@ class FastNewsReaderCard extends HTMLElement {
     this._lastStateStamp = null;
     // Reset interactive state when config changes (eg. after editor save).
     this._searchQuery = "";
+    this._searchOpen = false;
     this._activeTopic = null;
     this._topicsMode = this._config.topics_mode || "categories";
     this._showFavoritesOnly = false;
@@ -1771,19 +1777,41 @@ class FastNewsReaderCard extends HTMLElement {
       </svg>
     </button>`;
 
-    const searchHtml = this._config.show_search
-      ? `<div class="searchbar">
-          <input type="search" class="search-input"
-                 placeholder="Search articles..."
-                 value="${escapeHtml(this._searchQuery)}"
-                 aria-label="Search articles">
-        </div>`
-      : "";
-
     // Show the topics bar whenever the option is on AND switching modes
     // could yield something useful (multi-feed, or current mode has topics).
-    const showTopicsBar =
+    const showTopicsControls =
       this._config.show_topics && (topicList.length > 0 || feedCount > 1);
+    // The whole toolbar row exists if any control wants in.
+    const showToolbar = this._config.show_search || showTopicsControls;
+    // When the user clicks the search icon, the row collapses and the
+    // search input takes its place. Closing the search clears the query.
+    const searchActive = this._searchOpen && this._config.show_search;
+
+    const searchToggleHtml = this._config.show_search
+      ? `<button class="filter-btn search-toggle-btn" type="button"
+                title="Search articles" aria-label="Open search"
+                aria-pressed="${searchActive}"
+                data-active="${searchActive}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+        </button>`
+      : "";
+
+    const searchOpenHtml = `<div class="search-row">
+      <div class="search-row-input">
+        <input type="search" class="search-input"
+               placeholder="Search articles..."
+               value="${escapeHtml(this._searchQuery)}"
+               aria-label="Search articles">
+      </div>
+      <button class="filter-btn close-search-btn" type="button"
+              title="Close search" aria-label="Close search">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
+    </div>`;
     const MODE_LABELS = {
       categories: "Topics",
       sources: "Sources",
@@ -1794,7 +1822,7 @@ class FastNewsReaderCard extends HTMLElement {
       sources: "the source feed each article comes from",
       themes: "the curated theme assigned to each feed (news, tech, sport, ...)",
     };
-    const modeToggleHtml = showTopicsBar
+    const modeToggleHtml = showTopicsControls
       ? `<button class="topic-mode-btn" type="button"
                 title="Currently grouped by ${MODE_TITLES[this._topicsMode] || ""}. Click to switch."
                 aria-label="Switch grouping mode">
@@ -1805,7 +1833,7 @@ class FastNewsReaderCard extends HTMLElement {
         </button>`
       : "";
 
-    const stateFiltersHtml = showTopicsBar
+    const stateFiltersHtml = showTopicsControls
       ? `<button class="filter-btn fav-filter" type="button"
                 data-active="${this._showFavoritesOnly}"
                 title="Show only favorites" aria-label="Filter favorites"
@@ -1831,25 +1859,36 @@ class FastNewsReaderCard extends HTMLElement {
           </svg>
         </button>`
       : "";
-    const topicsHtml = showTopicsBar
-      ? `<div class="topics-wrap at-start">
-          <div class="topics" role="tablist">
-            ${modeToggleHtml}
-            ${stateFiltersHtml}
-            <button class="topic ${this._activeTopic == null ? "active" : ""}"
-                    data-topic="" role="tab"
-                    aria-selected="${this._activeTopic == null}">All</button>
-            ${topicList
-              .map(
-                (t) =>
-                  `<button class="topic ${this._activeTopic === t ? "active" : ""}"
-                           data-topic="${escapeHtml(t)}" role="tab"
-                           aria-selected="${this._activeTopic === t}">${escapeHtml(t)}</button>`
-              )
-              .join("")}
-          </div>
-        </div>`
+    const topicPillsHtml = showTopicsControls
+      ? `<button class="topic ${this._activeTopic == null ? "active" : ""}"
+                data-topic="" role="tab"
+                aria-selected="${this._activeTopic == null}">All</button>
+        ${topicList
+          .map(
+            (t) =>
+              `<button class="topic ${this._activeTopic === t ? "active" : ""}"
+                       data-topic="${escapeHtml(t)}" role="tab"
+                       aria-selected="${this._activeTopic === t}">${escapeHtml(t)}</button>`
+          )
+          .join("")}`
       : "";
+
+    let toolbarHtml = "";
+    if (showToolbar) {
+      if (searchActive) {
+        toolbarHtml = searchOpenHtml;
+      } else {
+        // Order requested: search, favorites, read-later, unread, mode toggle, topic pills.
+        toolbarHtml = `<div class="topics-wrap at-start">
+          <div class="topics" role="tablist">
+            ${searchToggleHtml}
+            ${stateFiltersHtml}
+            ${modeToggleHtml}
+            ${topicPillsHtml}
+          </div>
+        </div>`;
+      }
+    }
 
     if (!visible.length) {
       const emptyMsg = filterActive ? "No matches." : "No entries.";
@@ -1861,8 +1900,7 @@ class FastNewsReaderCard extends HTMLElement {
           ${refreshBtnHtml}
         </div>
         ${warningHtml}
-        ${searchHtml}
-        ${topicsHtml}
+        ${toolbarHtml}
         <div class="empty">${emptyMsg}</div>
       `);
       this._attachInteractiveHandlers(focusedSearch, caretPos);
@@ -1890,8 +1928,7 @@ class FastNewsReaderCard extends HTMLElement {
         ${refreshBtnHtml}
       </div>
       ${warningHtml}
-      ${searchHtml}
-      ${topicsHtml}
+      ${toolbarHtml}
       <div class="list"${listStyle}>${itemsHtml}</div>
     `);
 
@@ -1916,11 +1953,20 @@ class FastNewsReaderCard extends HTMLElement {
       // run before any document-level handler attached at capture too.
       searchEl.addEventListener(
         "keydown",
-        (ev) => ev.stopPropagation(),
+        (ev) => {
+          ev.stopPropagation();
+          // ESC closes search and resets the query, mirroring the close button.
+          if (ev.key === "Escape") {
+            this._searchQuery = "";
+            this._searchOpen = false;
+            this._render();
+          }
+        },
         true
       );
-      // Restore focus if user was typing when a refresh forced a re-render.
-      if (prevFocusedSearch) {
+      // Restore focus if user was typing when a refresh forced a re-render,
+      // or if the user just opened the search row (auto-focus the input).
+      if (prevFocusedSearch || this._searchOpen) {
         searchEl.focus();
         if (prevCaretPos != null) {
           const len = searchEl.value.length;
@@ -1928,6 +1974,22 @@ class FastNewsReaderCard extends HTMLElement {
           searchEl.setSelectionRange(pos, pos);
         }
       }
+    }
+
+    const searchToggleBtn = this.shadowRoot.querySelector(".search-toggle-btn");
+    if (searchToggleBtn) {
+      searchToggleBtn.addEventListener("click", () => {
+        this._searchOpen = true;
+        this._render();
+      });
+    }
+    const closeSearchBtn = this.shadowRoot.querySelector(".close-search-btn");
+    if (closeSearchBtn) {
+      closeSearchBtn.addEventListener("click", () => {
+        this._searchQuery = "";
+        this._searchOpen = false;
+        this._render();
+      });
     }
     this.shadowRoot.querySelectorAll(".topic").forEach((btn) => {
       btn.addEventListener("click", () => {
