@@ -86,12 +86,17 @@ class FastNewsReaderCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
     def _safe_build_entry(self, entry: Any) -> dict[str, Any] | None:
-        """Build entry dict, swallowing per-entry errors so one bad item doesn't kill the update."""
+        """Build entry dict, swallowing per-entry errors so one bad item doesn't kill the update.
+
+        Logged at debug level because a feed can publish many malformed entries
+        in a row and we already drop them silently; users only need to see this
+        when actively troubleshooting a specific feed.
+        """
         try:
             return self._build_entry(entry)
-        except Exception:  # noqa: BLE001
-            _LOGGER.exception(
-                "Skipping malformed entry in feed %s", self.feed_url
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug(
+                "Skipping malformed entry in feed %s: %s", self.feed_url, err
             )
             return None
 

@@ -26,10 +26,16 @@ _CARD_REGISTERED_FLAG = f"{DOMAIN}_card_registered"
 
 
 def _read_manifest_version() -> str:
+    manifest_path = Path(__file__).parent / "manifest.json"
     try:
-        manifest_path = Path(__file__).parent / "manifest.json"
         return json.loads(manifest_path.read_text()).get("version", "0")
-    except Exception:  # noqa: BLE001
+    except (OSError, ValueError) as err:
+        _LOGGER.warning(
+            "Could not read version from %s (%s); falling back to 0. The "
+            "Lovelace card URL will not bust caches until this is fixed.",
+            manifest_path,
+            err,
+        )
         return "0"
 
 

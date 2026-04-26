@@ -2,5 +2,5 @@
   "name": "Fast News Reader",
   "render_readme": true,
   "country": ["DE"],
-  "homeassistant": "2024.12.0"
+  "homeassistant": "2025.12.0"
 }

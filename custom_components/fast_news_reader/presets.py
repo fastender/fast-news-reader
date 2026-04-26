@@ -110,11 +110,11 @@ PRESETS: list[Preset] = [
 ]
 
 
+_PRESET_BY_SLUG: dict[str, Preset] = {p["slug"]: p for p in PRESETS}
+
+
 def get_preset(slug: str) -> Preset | None:
-    for preset in PRESETS:
-        if preset["slug"] == slug:
-            return preset
-    return None
+    return _PRESET_BY_SLUG.get(slug)
 
 
 def available_categories_for_language(
