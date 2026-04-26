@@ -8,6 +8,21 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.7] - 2026-04-26
+
+### Fixed
+
+- **Stop spamming the recorder with full article HTML.** The main feed
+  sensor exposed the full `entries` list (with `<content:encoded>` HTML
+  for every article) and `channel` block as state attributes. With feeds
+  like Heise or Tagesschau publishing 20+ entries of multi-kilobyte HTML,
+  these routinely exceeded Home Assistant's 16 KB-per-attribute soft limit
+  and produced repeated 'state attributes exceed maximum size' warnings,
+  plus unnecessary database growth. Both attributes are now declared
+  `_unrecorded_attributes`, so they remain visible at runtime (the
+  Lovelace card still reads them) but are no longer persisted into the
+  recorder database.
+
 ## [0.8.6] - 2026-04-26
 
 ### Fixed
@@ -84,6 +99,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.8.7]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.7
 [0.8.6]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.6
 [0.8.5]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.5
 [0.8.4]: https://github.com/fastender/fast-news-reader/releases/tag/v0.8.4

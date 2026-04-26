@@ -58,6 +58,12 @@ class FastNewsReaderSensor(
 
     _attr_has_entity_name = False
     _attr_icon = "mdi:rss"
+    # Keep `entries` and `channel` out of the recorder. With full <content:encoded>
+    # HTML they routinely exceed HA's 16 KB-per-attribute soft limit, which
+    # otherwise spams 'state attributes exceed maximum size' warnings and bloats
+    # the database. Runtime state still carries them, so the Lovelace card sees
+    # them as before.
+    _unrecorded_attributes = frozenset({"entries", "channel"})
 
     def __init__(
         self,
