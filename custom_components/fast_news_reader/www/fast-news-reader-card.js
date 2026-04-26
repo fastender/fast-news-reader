@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.13.0";
+const CARD_VERSION = "0.13.1";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -697,6 +697,24 @@ const MODAL_STYLES = `
     display: flex; gap: 6px;
     z-index: 3;
   }
+  .theme-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: none;
+  }
+  .theme-badge.has-theme { display: inline-block; }
   .action-btn {
     width: 36px; height: 36px;
     border: none; border-radius: 50%;
@@ -875,6 +893,7 @@ class FastNewsReaderModal extends HTMLElement {
         <div class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
         <button class="nav prev" aria-label="Previous">‹</button>
         <article class="panel" tabindex="-1">
+          <div class="theme-badge" aria-hidden="true"></div>
           <div class="actions">
             <button class="action-btn save" title="Read later" aria-label="Read later">
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -927,6 +946,7 @@ class FastNewsReaderModal extends HTMLElement {
       fav: r.querySelector(".action-btn.fav"),
       hide: r.querySelector(".action-btn.hide"),
       live: r.querySelector(".sr-only"),
+      themeBadge: r.querySelector(".theme-badge"),
     };
 
     this._refs.close.addEventListener("click", () => this.close());
@@ -969,6 +989,16 @@ class FastNewsReaderModal extends HTMLElement {
     ArticleStore.add("viewed", articleId(e));
     const r = this._refs;
     const sourceTitle = this._sourceTitleFor(e);
+    const themeLabel = e._sourceThemeLabel || "";
+    if (r.themeBadge) {
+      if (themeLabel) {
+        r.themeBadge.textContent = themeLabel;
+        r.themeBadge.classList.add("has-theme");
+      } else {
+        r.themeBadge.textContent = "";
+        r.themeBadge.classList.remove("has-theme");
+      }
+    }
     const html = sanitizeHtml(e.content || e.summary || "", e.image || "");
     const dateStr = absoluteDate(e.published, this._locale);
 

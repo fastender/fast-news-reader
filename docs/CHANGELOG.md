@@ -8,6 +8,16 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] - 2026-04-26
+
+### Added
+
+- **Theme pill in the article modal.** A small uppercase badge in the
+  top-left corner of the modal's hero image shows the curated theme
+  for the source ("News", "Tech", "Sport", and so on). Mirror image of
+  the action buttons in the top-right corner. Hidden when the source
+  has no theme (custom feeds not in the preset list).
+
 ## [0.13.0] - 2026-04-26
 
 ### Added
@@ -323,6 +333,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.13.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.1
 [0.13.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.0
 [0.12.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.12.0
 [0.11.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.2
