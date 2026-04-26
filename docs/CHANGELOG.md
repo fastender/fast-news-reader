@@ -8,6 +8,19 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.2] - 2026-04-26
+
+### Fixed
+
+- **Card search input no longer triggers HA's keyboard shortcuts.** Home
+  Assistant listens at the document level for single-letter shortcuts
+  (`a` opens Assist, `e` opens the entity search, `c` opens the command
+  palette, and so on). Because the card's search field lives inside a
+  shadow DOM, those shortcuts hijacked typing after the first character:
+  pressing "Be" would land "B" in the input and open Assist on "e". The
+  search input now stops `keydown` from propagating to the document, so
+  every keystroke stays where the user is typing.
+
 ## [0.10.1] - 2026-04-26
 
 ### Added
@@ -203,6 +216,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.10.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.2
 [0.10.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.0
 [0.9.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.9.0

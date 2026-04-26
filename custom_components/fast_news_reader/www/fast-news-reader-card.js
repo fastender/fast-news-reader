@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.10.1";
+const CARD_VERSION = "0.10.2";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1553,6 +1553,11 @@ class FastNewsReaderCard extends HTMLElement {
         this._searchQuery = ev.target.value;
         this._render();
       });
+      // HA listens for single-letter keyboard shortcuts (`a` opens Assist,
+      // `e` opens entity search, etc.) at the document level. Without this
+      // those shortcuts hijack typing in our search box after the first
+      // keystroke. Keep the event inside the input.
+      searchEl.addEventListener("keydown", (ev) => ev.stopPropagation());
       // Restore focus if user was typing when a refresh forced a re-render.
       if (prevFocusedSearch) {
         searchEl.focus();
