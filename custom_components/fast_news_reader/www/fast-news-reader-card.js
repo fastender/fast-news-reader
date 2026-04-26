@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.15.0";
+const CARD_VERSION = "0.15.1";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1840,7 +1840,8 @@ class FastNewsReaderCard extends HTMLElement {
 
     const searchToggleHtml = this._config.show_search
       ? `<button class="filter-btn search-toggle-btn" type="button"
-                title="Search articles" aria-label="Open search"
+                title="${searchActive ? "Close search" : "Search articles"}"
+                aria-label="${searchActive ? "Close search" : "Open search"}"
                 aria-pressed="${searchActive}"
                 data-active="${searchActive}">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -1856,12 +1857,6 @@ class FastNewsReaderCard extends HTMLElement {
                value="${escapeHtml(this._searchQuery)}"
                aria-label="Search articles">
       </div>
-      <button class="filter-btn close-search-btn" type="button"
-              title="Close search" aria-label="Close search">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-      </button>
     </div>`;
     const MODE_LABELS = {
       categories: "Topics",
@@ -2077,15 +2072,14 @@ class FastNewsReaderCard extends HTMLElement {
     const searchToggleBtn = this.shadowRoot.querySelector(".search-toggle-btn");
     if (searchToggleBtn) {
       searchToggleBtn.addEventListener("click", () => {
-        this._searchOpen = true;
-        this._render();
-      });
-    }
-    const closeSearchBtn = this.shadowRoot.querySelector(".close-search-btn");
-    if (closeSearchBtn) {
-      closeSearchBtn.addEventListener("click", () => {
-        this._searchQuery = "";
-        this._searchOpen = false;
+        if (this._searchOpen) {
+          // Closing via the same button: clear the query so re-opening
+          // gives the user a clean field, matching what Escape does.
+          this._searchQuery = "";
+          this._searchOpen = false;
+        } else {
+          this._searchOpen = true;
+        }
         this._render();
       });
     }

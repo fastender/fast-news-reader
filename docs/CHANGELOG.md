@@ -8,6 +8,15 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.15.1] - 2026-04-26
+
+### Changed
+
+- **Search button is now a toggle.** Clicking the magnifying-glass icon
+  in the header opens the search row; clicking it again clears the
+  query and closes the search, matching what Escape already did. The
+  separate close button (X) inside the search row is gone.
+
 ## [0.15.0] - 2026-04-26
 
 ### Changed
@@ -386,6 +395,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.15.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.1
 [0.15.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.0
 [0.14.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.14.0
 [0.13.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.1
