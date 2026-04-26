@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.10.2";
+const CARD_VERSION = "0.11.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1107,6 +1107,53 @@ const CARD_STYLES = `
     border-color: var(--primary-color, #FF6B4A);
     color: var(--text-primary-color, #fff);
   }
+  .topic-mode-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: 1px dashed var(--divider-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--secondary-text-color);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .topic-mode-btn:hover {
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+  }
+  .refresh-btn {
+    flex: 0 0 auto;
+    width: 30px; height: 30px;
+    border: none; border-radius: 50%;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .refresh-btn:hover {
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+  }
+  .refresh-btn:disabled { cursor: default; }
+  .refresh-btn.spinning svg {
+    animation: fnr-refresh-spin 1.5s linear infinite;
+    transform-origin: center;
+  }
+  @keyframes fnr-refresh-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
   .list { display: flex; flex-direction: column; }
   .article {
     display: grid;
@@ -1177,6 +1224,7 @@ class FastNewsReaderCard extends HTMLElement {
     this._lastStateStamp = null;
     this._searchQuery = "";
     this._activeTopic = null;
+    this._topicsMode = null; // resolved from config in setConfig
     this._stateChangedHandler = () => this._render();
   }
 
@@ -1241,6 +1289,7 @@ class FastNewsReaderCard extends HTMLElement {
     // Reset interactive state when config changes (eg. after editor save).
     this._searchQuery = "";
     this._activeTopic = null;
+    this._topicsMode = this._config.topics_mode || "categories";
     this._render();
   }
 
@@ -1310,7 +1359,7 @@ class FastNewsReaderCard extends HTMLElement {
 
   _collectTopics(entries) {
     const set = new Set();
-    if (this._config.topics_mode === "sources") {
+    if (this._topicsMode === "sources") {
       for (const e of entries) {
         if (e._sourceTitle) set.add(e._sourceTitle);
       }
@@ -1335,7 +1384,7 @@ class FastNewsReaderCard extends HTMLElement {
       });
     }
     if (this._config.show_topics && this._activeTopic) {
-      if (this._config.topics_mode === "sources") {
+      if (this._topicsMode === "sources") {
         out = out.filter((e) => e._sourceTitle === this._activeTopic);
       } else {
         out = out.filter((e) =>
@@ -1428,6 +1477,18 @@ class FastNewsReaderCard extends HTMLElement {
       ? `<img class="src-icon" src="${escapeHtml(headerIcon)}" alt="" loading="lazy" onerror="this.remove()">`
       : "";
 
+    const feedCount = this._config.entities.length;
+    const articleNoun = totalAvailable === 1 ? "article" : "articles";
+    const fromText =
+      feedCount > 1 ? ` from ${feedCount} feed${feedCount === 1 ? "" : "s"}` : "";
+    const countLabel = `${totalAvailable} ${articleNoun}${fromText}`;
+
+    const refreshBtnHtml = `<button class="refresh-btn" title="Refresh feeds" aria-label="Refresh feeds" type="button">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+      </svg>
+    </button>`;
+
     const searchHtml = this._config.show_search
       ? `<div class="searchbar">
           <input type="search" class="search-input"
@@ -1437,8 +1498,27 @@ class FastNewsReaderCard extends HTMLElement {
         </div>`
       : "";
 
-    const topicsHtml = topicList.length
+    // Show the topics bar whenever the option is on AND switching modes
+    // could yield something useful (multi-feed, or current mode has topics).
+    const showTopicsBar =
+      this._config.show_topics && (topicList.length > 0 || feedCount > 1);
+    const modeToggleHtml = showTopicsBar
+      ? `<button class="topic-mode-btn" type="button"
+                title="Currently grouped by ${
+                  this._topicsMode === "sources" ? "source feeds" : "article categories"
+                }. Click to switch."
+                aria-label="Switch grouping mode">
+          <span class="mode-label">${
+            this._topicsMode === "sources" ? "Sources" : "Topics"
+          }</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path fill="currentColor" d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/>
+          </svg>
+        </button>`
+      : "";
+    const topicsHtml = showTopicsBar
       ? `<div class="topics" role="tablist">
+          ${modeToggleHtml}
           <button class="topic ${this._activeTopic == null ? "active" : ""}"
                   data-topic="" role="tab"
                   aria-selected="${this._activeTopic == null}">All</button>
@@ -1456,7 +1536,12 @@ class FastNewsReaderCard extends HTMLElement {
     if (!visible.length) {
       const emptyMsg = filterActive ? "No matches." : "No entries.";
       this._renderShell(`
-        <div class="header">${headerIconHtml}<span>${safeHeader}</span></div>
+        <div class="header">
+          ${headerIconHtml}
+          <span>${safeHeader}</span>
+          <span class="count">${countLabel}</span>
+          ${refreshBtnHtml}
+        </div>
         ${warningHtml}
         ${searchHtml}
         ${topicsHtml}
@@ -1524,7 +1609,8 @@ class FastNewsReaderCard extends HTMLElement {
       <div class="header">
         ${headerIconHtml}
         <span>${safeHeader}</span>
-        <span class="count">${totalAvailable} entr${totalAvailable === 1 ? "y" : "ies"}</span>
+        <span class="count">${countLabel}</span>
+        ${refreshBtnHtml}
       </div>
       ${warningHtml}
       ${searchHtml}
@@ -1575,6 +1661,37 @@ class FastNewsReaderCard extends HTMLElement {
         this._render();
       });
     });
+
+    const modeBtn = this.shadowRoot.querySelector(".topic-mode-btn");
+    if (modeBtn) {
+      modeBtn.addEventListener("click", () => {
+        this._topicsMode =
+          this._topicsMode === "sources" ? "categories" : "sources";
+        // Active topic from previous mode almost certainly does not exist
+        // in the new mode; reset so the user starts fresh.
+        this._activeTopic = null;
+        this._render();
+      });
+    }
+
+    const refreshBtn = this.shadowRoot.querySelector(".refresh-btn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", () => {
+        if (refreshBtn.disabled) return;
+        const ids = this._config.entities.map((f) => f.entity);
+        if (this._hass && ids.length) {
+          this._hass.callService("homeassistant", "update_entity", {
+            entity_id: ids,
+          });
+        }
+        refreshBtn.disabled = true;
+        refreshBtn.classList.add("spinning");
+        setTimeout(() => {
+          refreshBtn.classList.remove("spinning");
+          refreshBtn.disabled = false;
+        }, 1500);
+      });
+    }
   }
 
   _renderShell(inner) {

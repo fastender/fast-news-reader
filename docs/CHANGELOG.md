@@ -8,6 +8,32 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-04-26
+
+### Added
+
+- **Topics-mode toggle in the front-end.** A small dashed pill labelled
+  "Topics" or "Sources" sits to the left of the "All" pill in the
+  topics bar. Tapping it switches the grouping mode live without
+  opening the card editor. The default mode still comes from the
+  `topics_mode` config option, but the user can override per session;
+  reloading the dashboard resets to the configured default. The active
+  topic clears automatically when modes switch, since a topic from the
+  old mode rarely exists in the new one.
+- **"X articles from N feeds" header count.** Replaces the previous
+  "7 entries" label so multi-feed cards show how many sources the
+  merge is pulling from. Single-feed cards still read just
+  "X articles".
+- **Refresh button in the header.** Material refresh icon next to the
+  count. One click triggers `homeassistant.update_entity` for every
+  configured feed sensor, so the user can force a fetch without
+  waiting for the next scan interval. The icon spins for 1.5 seconds
+  as feedback and the button is disabled during that window so a
+  double-click cannot fan out into duplicate refreshes.
+- The topics bar now also appears in multi-feed cards even when no
+  article carries an RSS category, since switching the mode toggle to
+  "Sources" still produces useful filters.
+
 ## [0.10.2] - 2026-04-26
 
 ### Fixed
@@ -216,6 +242,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.11.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.11.0
 [0.10.2]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.2
 [0.10.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.1
 [0.10.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.10.0
