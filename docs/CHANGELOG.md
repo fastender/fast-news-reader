@@ -8,6 +8,42 @@ Earlier releases (0.1.x through 0.8.4) are documented under
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] - 2026-04-26
+
+### Changed
+
+- **Two-line header.** Where the card previously read "Feeds · 7
+  entries", the header is now a count on top ("200 articles") with a
+  smaller subtitle below ("from 5 feeds" for multi-feed cards, the
+  publisher name for single-feed). Quicker to scan, more useful at a
+  glance.
+- **Buttons moved to the header.** The state filters (unread,
+  read-later, favorites), the search button, the new time filter, and
+  refresh now sit on the right side of the header. Order:
+  unread, read-later, favorites, search, time filter, refresh. The
+  topics bar below now only carries the source/topic mode toggle plus
+  the topic pills, with bottom spacing so articles do not crowd into
+  it.
+- **State filters are mutually exclusive.** Picking unread, read-later,
+  or favorites clears the other two. Combinations like "unread and
+  starred" no longer work; pick the one that matters most. Tap the
+  same filter twice to clear it.
+
+### Added
+
+- **Time filter.** A funnel-shaped button next to refresh opens a
+  popover with time-range presets:
+  - Last hour
+  - Last 12 hours
+  - Last 24 hours
+  - Last 3 days
+  - Last week
+  - All time (clears the filter)
+
+  Filters articles by `published_dt`, applied on top of search, topic,
+  and state filters. Active selection is highlighted in the popover.
+  Click outside the popover or pick "All time" to clear.
+
 ## [0.14.0] - 2026-04-26
 
 ### Changed
@@ -350,6 +386,7 @@ next round of refactors can move with confidence.
   instead of swapping their background color. Active-state color
   (orange when toggled on) is unchanged.
 
+[0.15.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.15.0
 [0.14.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.14.0
 [0.13.1]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.1
 [0.13.0]: https://github.com/fastender/fast-news-reader/releases/tag/v0.13.0

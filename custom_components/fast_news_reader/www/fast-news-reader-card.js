@@ -17,7 +17,7 @@
  *   title: "My news"
  */
 
-const CARD_VERSION = "0.14.0";
+const CARD_VERSION = "0.15.0";
 
 console.info(
   `%c FAST-NEWS-READER-CARD %c v${CARD_VERSION} `,
@@ -1068,19 +1068,33 @@ const CARD_STYLES = `
   :host { display: block; }
   ha-card { overflow: hidden; padding: 0; }
   .header {
-    padding: 16px 16px 8px;
-    font-size: 1.05rem;
-    font-weight: 600;
+    position: relative;
+    padding: 16px 16px 12px;
     color: var(--primary-text-color);
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  .header .count {
+  .header-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.2;
+  }
+  .header-count {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .header-subtitle {
+    font-size: 0.85rem;
     font-weight: 400;
     color: var(--secondary-text-color);
-    font-size: 0.85rem;
-    margin-left: auto;
+    margin-top: 2px;
+  }
+  .header-actions {
+    display: flex;
+    gap: 4px;
+    flex: 0 0 auto;
+    align-items: center;
   }
   .header .src-icon {
     width: 20px; height: 20px;
@@ -1088,6 +1102,42 @@ const CARD_STYLES = `
     object-fit: contain;
     background: var(--secondary-background-color, transparent);
     flex: 0 0 auto;
+  }
+  .time-filter-popover {
+    position: absolute;
+    top: 100%;
+    right: 16px;
+    margin-top: 4px;
+    background: var(--card-background-color, #fff);
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    padding: 4px;
+    z-index: 10;
+    min-width: 170px;
+    display: flex;
+    flex-direction: column;
+  }
+  .time-option {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--primary-text-color);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: 0.88rem;
+    border-radius: 6px;
+  }
+  .time-option:hover {
+    background: var(--secondary-background-color);
+  }
+  .time-option.active {
+    background: var(--primary-color, #FF6B4A);
+    color: var(--text-primary-color, #fff);
+    font-weight: 500;
   }
   .source-tag .src-icon-sm {
     width: 14px; height: 14px;
@@ -1118,7 +1168,7 @@ const CARD_STYLES = `
   .search-row {
     display: flex;
     gap: 6px;
-    padding: 12px 16px 0;
+    padding: 4px 16px 12px;
     align-items: center;
   }
   .search-row-input { flex: 1 1 auto; min-width: 0; }
@@ -1139,7 +1189,8 @@ const CARD_STYLES = `
   }
   .topics-wrap {
     position: relative;
-    margin-top: 12px;
+    margin-top: 4px;
+    margin-bottom: 12px;
   }
   .topics-wrap::before,
   .topics-wrap::after {
@@ -1346,9 +1397,10 @@ class FastNewsReaderCard extends HTMLElement {
     this._searchOpen = false;
     this._activeTopic = null;
     this._topicsMode = null; // resolved from config in setConfig
-    this._showFavoritesOnly = false;
-    this._showSavedOnly = false;
-    this._showUnreadOnly = false;
+    this._activeStateFilter = null; // "favorites" | "saved" | "unread" | null
+    this._timeFilterHours = null;
+    this._filterPopoverOpen = false;
+    this._docClickClose = null; // registered when popover opens
     this._stateChangedHandler = () => this._render();
   }
 
@@ -1357,6 +1409,10 @@ class FastNewsReaderCard extends HTMLElement {
   }
   disconnectedCallback() {
     window.removeEventListener("fnr:state-changed", this._stateChangedHandler);
+    if (this._docClickClose) {
+      document.removeEventListener("mousedown", this._docClickClose, true);
+      this._docClickClose = null;
+    }
   }
 
   static async getConfigElement() {
@@ -1415,9 +1471,9 @@ class FastNewsReaderCard extends HTMLElement {
     this._searchOpen = false;
     this._activeTopic = null;
     this._topicsMode = this._config.topics_mode || "categories";
-    this._showFavoritesOnly = false;
-    this._showSavedOnly = false;
-    this._showUnreadOnly = false;
+    this._activeStateFilter = null;
+    this._timeFilterHours = null;
+    this._filterPopoverOpen = false;
     this._render();
   }
 
@@ -1593,19 +1649,15 @@ class FastNewsReaderCard extends HTMLElement {
     const saved = ArticleStore.load("saved");
     const locale = this._hass?.locale?.language || "en";
 
-    const feedCount = this._config.entities.length;
     const articleNoun = totalAvailable === 1 ? "article" : "articles";
-    const fromText =
-      feedCount > 1 ? ` from ${feedCount} feed${feedCount === 1 ? "" : "s"}` : "";
-    const countEl = this.shadowRoot.querySelector(".count");
-    if (countEl) countEl.textContent = `${totalAvailable} ${articleNoun}${fromText}`;
+    const countEl = this.shadowRoot.querySelector(".header-count");
+    if (countEl) countEl.textContent = `${totalAvailable} ${articleNoun}`;
 
     const filterActive =
       (this._config.show_search && this._searchQuery.trim()) ||
       (this._config.show_topics && this._activeTopic) ||
-      this._showFavoritesOnly ||
-      this._showSavedOnly ||
-      this._showUnreadOnly;
+      this._activeStateFilter ||
+      this._timeFilterHours != null;
 
     const listEl = this.shadowRoot.querySelector(".list");
     const emptyEl = this.shadowRoot.querySelector(".empty");
@@ -1665,17 +1717,19 @@ class FastNewsReaderCard extends HTMLElement {
         );
       }
     }
-    if (this._showFavoritesOnly) {
+    if (this._activeStateFilter === "favorites") {
       const favs = ArticleStore.load("favorite");
       out = out.filter((e) => favs.has(articleId(e)));
-    }
-    if (this._showSavedOnly) {
+    } else if (this._activeStateFilter === "saved") {
       const saved = ArticleStore.load("saved");
       out = out.filter((e) => saved.has(articleId(e)));
-    }
-    if (this._showUnreadOnly) {
+    } else if (this._activeStateFilter === "unread") {
       const viewed = ArticleStore.load("viewed");
       out = out.filter((e) => !viewed.has(articleId(e)));
+    }
+    if (this._timeFilterHours != null) {
+      const cutoff = Date.now() - this._timeFilterHours * 3600 * 1000;
+      out = out.filter((e) => entryDate(e) >= cutoff);
     }
     return out;
   }
@@ -1725,9 +1779,8 @@ class FastNewsReaderCard extends HTMLElement {
     const filterActive =
       (this._config.show_search && this._searchQuery.trim()) ||
       (this._config.show_topics && this._activeTopic) ||
-      this._showFavoritesOnly ||
-      this._showSavedOnly ||
-      this._showUnreadOnly;
+      this._activeStateFilter ||
+      this._timeFilterHours != null;
 
     const isMulti = this._config.entities.length > 1;
     const headerTitle =
@@ -1781,8 +1834,6 @@ class FastNewsReaderCard extends HTMLElement {
     // could yield something useful (multi-feed, or current mode has topics).
     const showTopicsControls =
       this._config.show_topics && (topicList.length > 0 || feedCount > 1);
-    // The whole toolbar row exists if any control wants in.
-    const showToolbar = this._config.show_search || showTopicsControls;
     // When the user clicks the search icon, the row collapses and the
     // search input takes its place. Closing the search clears the query.
     const searchActive = this._searchOpen && this._config.show_search;
@@ -1833,32 +1884,70 @@ class FastNewsReaderCard extends HTMLElement {
         </button>`
       : "";
 
-    const stateFiltersHtml = showTopicsControls
-      ? `<button class="filter-btn fav-filter" type="button"
-                data-active="${this._showFavoritesOnly}"
-                title="Show only favorites" aria-label="Filter favorites"
-                aria-pressed="${this._showFavoritesOnly}">
+    // State filter buttons (mutex: only one active at a time). Order
+    // requested: only unread, only read, favorites.
+    const isFavActive = this._activeStateFilter === "favorites";
+    const isSaveActive = this._activeStateFilter === "saved";
+    const isUnreadActive = this._activeStateFilter === "unread";
+    const stateFiltersHtml = this._config.show_topics
+      ? `<button class="filter-btn unread-filter" type="button"
+                data-active="${isUnreadActive}"
+                title="Show only unread" aria-label="Filter unread"
+                aria-pressed="${isUnreadActive}">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            <circle cx="12" cy="12" r="6" fill="currentColor"/>
           </svg>
         </button>
         <button class="filter-btn save-filter" type="button"
-                data-active="${this._showSavedOnly}"
+                data-active="${isSaveActive}"
                 title="Show only read-later" aria-label="Filter read-later"
-                aria-pressed="${this._showSavedOnly}">
+                aria-pressed="${isSaveActive}">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
             <path fill="currentColor" d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
           </svg>
         </button>
-        <button class="filter-btn unread-filter" type="button"
-                data-active="${this._showUnreadOnly}"
-                title="Show only unread" aria-label="Filter unread"
-                aria-pressed="${this._showUnreadOnly}">
+        <button class="filter-btn fav-filter" type="button"
+                data-active="${isFavActive}"
+                title="Show only favorites" aria-label="Filter favorites"
+                aria-pressed="${isFavActive}">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <circle cx="12" cy="12" r="6" fill="currentColor"/>
+            <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
           </svg>
         </button>`
       : "";
+
+    // Time filter button (opens popover with time-range presets).
+    const timeFilterActive = this._timeFilterHours != null;
+    const timeFilterHtml = this._config.show_topics
+      ? `<button class="filter-btn time-filter-btn" type="button"
+                data-active="${timeFilterActive}"
+                title="Filter by time" aria-label="Filter by time"
+                aria-haspopup="true" aria-expanded="${this._filterPopoverOpen}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39c.51-.66.04-1.61-.79-1.61H5.04c-.83 0-1.3.95-.79 1.61z"/>
+          </svg>
+        </button>`
+      : "";
+
+    const TIME_OPTIONS = [
+      { hours: 1, label: "Last hour" },
+      { hours: 12, label: "Last 12 hours" },
+      { hours: 24, label: "Last 24 hours" },
+      { hours: 72, label: "Last 3 days" },
+      { hours: 168, label: "Last week" },
+      { hours: null, label: "All time" },
+    ];
+    const timeFilterPopoverHtml =
+      this._filterPopoverOpen && this._config.show_topics
+        ? `<div class="time-filter-popover" role="menu">
+          ${TIME_OPTIONS.map(
+            (opt) =>
+              `<button class="time-option ${
+                this._timeFilterHours === opt.hours ? "active" : ""
+              }" type="button" data-hours="${opt.hours == null ? "" : opt.hours}" role="menuitem">${escapeHtml(opt.label)}</button>`
+          ).join("")}
+        </div>`
+        : "";
     const topicPillsHtml = showTopicsControls
       ? `<button class="topic ${this._activeTopic == null ? "active" : ""}"
                 data-topic="" role="tab"
@@ -1873,32 +1962,46 @@ class FastNewsReaderCard extends HTMLElement {
           .join("")}`
       : "";
 
+    // The topics row now only carries the mode toggle + topic pills.
+    // State filters and search/refresh moved to the header.
     let toolbarHtml = "";
-    if (showToolbar) {
-      if (searchActive) {
-        toolbarHtml = searchOpenHtml;
-      } else {
-        // Order requested: search, favorites, read-later, unread, mode toggle, topic pills.
-        toolbarHtml = `<div class="topics-wrap at-start">
-          <div class="topics" role="tablist">
-            ${searchToggleHtml}
-            ${stateFiltersHtml}
-            ${modeToggleHtml}
-            ${topicPillsHtml}
-          </div>
-        </div>`;
-      }
+    if (searchActive) {
+      // Search input replaces the topics row entirely.
+      toolbarHtml = searchOpenHtml;
+    } else if (showTopicsControls) {
+      toolbarHtml = `<div class="topics-wrap at-start">
+        <div class="topics" role="tablist">
+          ${modeToggleHtml}
+          ${topicPillsHtml}
+        </div>
+      </div>`;
     }
+
+    // Two-line title block: count on top, "from N feeds" or publisher
+    // name underneath. Multi-feed always shows feed count; single-feed
+    // shows the publisher's channel title as subtitle.
+    const subtitleText = isMulti
+      ? `from ${feedCount} feed${feedCount === 1 ? "" : "s"}`
+      : safeHeader;
+    const headerHtml = `<div class="header">
+      ${headerIconHtml}
+      <div class="header-title">
+        <div class="header-count">${totalAvailable} ${articleNoun}</div>
+        ${subtitleText ? `<div class="header-subtitle">${subtitleText}</div>` : ""}
+      </div>
+      <div class="header-actions">
+        ${stateFiltersHtml}
+        ${searchToggleHtml}
+        ${timeFilterHtml}
+        ${refreshBtnHtml}
+      </div>
+      ${timeFilterPopoverHtml}
+    </div>`;
 
     if (!visible.length) {
       const emptyMsg = filterActive ? "No matches." : "No entries.";
       this._renderShell(`
-        <div class="header">
-          ${headerIconHtml}
-          <span>${safeHeader}</span>
-          <span class="count">${countLabel}</span>
-          ${refreshBtnHtml}
-        </div>
+        ${headerHtml}
         ${warningHtml}
         ${toolbarHtml}
         <div class="empty">${emptyMsg}</div>
@@ -1921,12 +2024,7 @@ class FastNewsReaderCard extends HTMLElement {
         : "";
 
     this._renderShell(`
-      <div class="header">
-        ${headerIconHtml}
-        <span>${safeHeader}</span>
-        <span class="count">${countLabel}</span>
-        ${refreshBtnHtml}
-      </div>
+      ${headerHtml}
       ${warningHtml}
       ${toolbarHtml}
       <div class="list"${listStyle}>${itemsHtml}</div>
@@ -2012,26 +2110,59 @@ class FastNewsReaderCard extends HTMLElement {
       });
     }
 
+    // Mutex state filters: toggling one off if it was already active,
+    // otherwise switching from whatever was active to this one.
+    const setStateFilter = (name) => {
+      this._activeStateFilter =
+        this._activeStateFilter === name ? null : name;
+      this._render();
+    };
     const favFilterBtn = this.shadowRoot.querySelector(".fav-filter");
     if (favFilterBtn) {
-      favFilterBtn.addEventListener("click", () => {
-        this._showFavoritesOnly = !this._showFavoritesOnly;
-        this._render();
-      });
+      favFilterBtn.addEventListener("click", () => setStateFilter("favorites"));
     }
     const saveFilterBtn = this.shadowRoot.querySelector(".save-filter");
     if (saveFilterBtn) {
-      saveFilterBtn.addEventListener("click", () => {
-        this._showSavedOnly = !this._showSavedOnly;
-        this._render();
-      });
+      saveFilterBtn.addEventListener("click", () => setStateFilter("saved"));
     }
     const unreadFilterBtn = this.shadowRoot.querySelector(".unread-filter");
     if (unreadFilterBtn) {
-      unreadFilterBtn.addEventListener("click", () => {
-        this._showUnreadOnly = !this._showUnreadOnly;
+      unreadFilterBtn.addEventListener("click", () => setStateFilter("unread"));
+    }
+
+    const timeFilterBtn = this.shadowRoot.querySelector(".time-filter-btn");
+    if (timeFilterBtn) {
+      timeFilterBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._filterPopoverOpen = !this._filterPopoverOpen;
         this._render();
       });
+    }
+    this.shadowRoot.querySelectorAll(".time-option").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const raw = btn.dataset.hours;
+        this._timeFilterHours = raw === "" ? null : Number(raw);
+        this._filterPopoverOpen = false;
+        this._render();
+      });
+    });
+    // Click-outside dismiss for the popover. Registered each render while
+    // the popover is open; the previous handler is detached up front so
+    // we never accumulate listeners.
+    if (this._docClickClose) {
+      document.removeEventListener("mousedown", this._docClickClose, true);
+      this._docClickClose = null;
+    }
+    if (this._filterPopoverOpen) {
+      this._docClickClose = (ev) => {
+        const path = ev.composedPath();
+        const popover = this.shadowRoot.querySelector(".time-filter-popover");
+        const btn = this.shadowRoot.querySelector(".time-filter-btn");
+        if (popover && (path.includes(popover) || path.includes(btn))) return;
+        this._filterPopoverOpen = false;
+        this._render();
+      };
+      document.addEventListener("mousedown", this._docClickClose, true);
     }
 
     const topicsWrap = this.shadowRoot.querySelector(".topics-wrap");
